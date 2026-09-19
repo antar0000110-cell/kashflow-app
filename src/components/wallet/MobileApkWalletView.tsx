@@ -30,7 +30,7 @@ import {
 } from '../../services/notificationService';
 import { NotificationPermissionModal } from '../notifications/NotificationPermissionModal';
 
-const SAVED_WALLETS_KEY = 'kashflow_saved_wallets';
+const SAVED_WALLETS_KEY = 'zux_saved_wallets';
 
 export const MobileApkWalletView: React.FC = () => {
   const {
@@ -405,7 +405,7 @@ export const MobileApkWalletView: React.FC = () => {
             </div>
 
             <div className="text-center text-[10px] text-slate-400 font-mono py-2">
-              KashFlow Secure Mobile Banking Engine v4.2
+              ZUX Secure Mobile Banking Engine v4.2
             </div>
           </div>
         ) : (

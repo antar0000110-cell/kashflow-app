@@ -2,7 +2,7 @@
 set -e
 
 echo "============================================================"
-echo "      KASHFLOW FINANCIAL OS - SIGNED APK BUILD ENGINE      "
+echo "         ZUX FINANCIAL OS - SIGNED APK BUILD ENGINE        "
 echo "============================================================"
 
 # 1. Install dependencies and build web frontend
@@ -27,11 +27,9 @@ npx cap sync android
 #    pulls kotlin-stdlib-jdk7/jdk8:1.6.21, conflicting with kotlin-stdlib:1.8.22.
 echo "[5/7] Patching Gradle to resolve Kotlin stdlib duplicate classes..."
 
-# Append resolutionStrategy to root build.gradle (before the last line if empty, or just at end)
 cat >> android/build.gradle << 'GRADLEOF'
 
-// KashFlow Patch: Force kotlin-stdlib-jdk7/jdk8 to match kotlin-stdlib version
-// to resolve DuplicateClasses error from org.apache.cordova:framework transitive deps
+// ZUX Patch: Force kotlin-stdlib-jdk7/jdk8 to match kotlin-stdlib version
 subprojects {
     afterEvaluate {
         configurations.all {
@@ -46,17 +44,17 @@ GRADLEOF
 
 # 5. Copy keystore to Android project
 echo "[6/7] Configuring release signing..."
-cp kashflow-release.keystore android/app/kashflow-release.keystore
+cp zux-release.keystore android/app/zux-release.keystore
 
 # Create signing config
 cat > android/app/signing.gradle << 'EOF'
 android {
     signingConfigs {
         release {
-            storeFile file('kashflow-release.keystore')
-            storePassword 'KashFlow2026SecurePass!'
-            keyAlias 'kashflow_key'
-            keyPassword 'KashFlow2026SecurePass!'
+            storeFile file('zux-release.keystore')
+            storePassword 'ZUX2026SecurePass!'
+            keyAlias 'zux_key'
+            keyPassword 'ZUX2026SecurePass!'
         }
     }
     buildTypes {
@@ -84,14 +82,14 @@ cd ..
 
 # Copy signed APK to output
 SIGNED_APK="android/app/build/outputs/apk/release/app-release.apk"
-OUTPUT_APK="kashflow-wallet-signed.apk"
+OUTPUT_APK="zux-wallet-signed.apk"
 
 if [ -f "$SIGNED_APK" ]; then
     cp "$SIGNED_APK" "$OUTPUT_APK"
     echo "============================================================"
     echo " SUCCESS: Signed Production APK Generated Successfully!"
     echo " Output file: $OUTPUT_APK"
-    echo " App ID: com.kashflow.wallet"
+    echo " App ID: com.zux.wallet"
     echo " Signed with 2048-bit RSA Keystore (Passes Google Play Protect)"
     echo "============================================================"
     ls -la "$OUTPUT_APK"

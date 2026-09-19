@@ -1,6 +1,6 @@
 {
-  "appId": "com.kashflow.wallet",
-  "appName": "KashFlow Wallet",
+  "appId": "com.zux.wallet",
+  "appName": "ZUX Wallet",
   "webDir": "dist",
   "plugins": {
     "SplashScreen": {

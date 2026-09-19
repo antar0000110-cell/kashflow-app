@@ -1,4 +1,4 @@
-# Android Build Dockerfile for KashFlow APK - Using official Android image
+# Android Build Dockerfile for ZUX APK - Using official Android image
 FROM ghcr.io/cirruslabs/android-sdk:34
 
 # Install Node.js 20
@@ -17,7 +17,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY capacitor.config.json ./
 COPY build-apk-docker.sh ./
-COPY kashflow-release.keystore ./
+COPY zux-release.keystore ./
 
 # Make build script executable
 RUN chmod +x build-apk-docker.sh

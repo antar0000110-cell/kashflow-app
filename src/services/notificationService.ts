@@ -1,4 +1,4 @@
-// KashFlow Push Notification & Device Permission Service
+// ZUX Push Notification & Device Permission Service
 // Handles Desktop Web, Mobile Web (Android/iOS), and Mobile App (PWA/Capacitor)
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 
@@ -11,7 +11,7 @@ export interface CachedNotificationState {
   promptCount: number;
 }
 
-const CACHE_STORAGE_KEY = 'kashflow_push_notifications_state';
+const CACHE_STORAGE_KEY = 'zux_push_notifications_state';
 
 // Audio Context Singleton for synthesized high-fidelity chimes
 let audioCtx: AudioContext | null = null;
@@ -314,7 +314,7 @@ export async function requestNotificationPermission(): Promise<'granted' | 'deni
       // Dispatch real Native System Push Notification
       setTimeout(() => {
         sendNativePushNotification(
-          '🔔 KashFlow Push Notifications Enabled',
+          '🔔 ZUX Push Notifications Enabled',
           'Instant notifications for deposits, withdrawals, and commissions are now active on this device.',
           'success',
           { tag: 'welcome-notification' }
@@ -355,7 +355,7 @@ export async function sendNativePushNotification(
     body,
     icon: '/favicon.ico',
     badge: '/favicon.ico',
-    tag: options?.tag || `kashflow-${Date.now()}`,
+    tag: options?.tag || `zux-${Date.now()}`,
     renotify: true,
     requireInteraction: options?.requireInteraction ?? (type === 'danger' || type === 'warning'),
     data: {

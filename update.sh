@@ -1,16 +1,16 @@
 #!/bin/bash
 # ==============================================================================
-# KashFlow Auto-Update Script
+# ZUX Auto-Update Script
 # Pulls latest from GitHub, rebuilds Docker image, and restarts container
 # ==============================================================================
 
 set -e
 
-REPO_DIR="/root/kashflow-app"
+REPO_DIR="/root/zux-app"
 cd "$REPO_DIR"
 
 echo "========================================================"
-echo "🔄 KashFlow Auto-Update Started"
+echo "🔄 ZUX Auto-Update Started"
 echo "========================================================"
 
 # 1. Fetch latest changes

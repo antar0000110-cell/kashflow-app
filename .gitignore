@@ -7,6 +7,7 @@ coverage/
 .env*
 !.env.example
 kashflow-release.keystore
+zux-release.keystore
 android_build.gradle
 app_build.gradle
 settings.gradle
