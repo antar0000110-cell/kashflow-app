@@ -1,0 +1,6 @@
+{
+  "name": "ZUX Financial OS",
+  "description": "Enterprise Egyptian fintech platform with real-time Cairo operations, automated 6,000 wallet traffic engine, subagent quota routing, and light mobile wallet terminal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
