@@ -1,5 +1,6 @@
 // KashFlow Push Notification & Device Permission Service
 // Handles Desktop Web, Mobile Web (Android/iOS), and Mobile App (PWA/Capacitor)
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 
 export type DeviceType = 'desktop' | 'mobile_web' | 'mobile_app';
 
@@ -99,10 +100,38 @@ export function playSynthesizedChime(type: 'success' | 'alert' | 'cash' = 'cash'
 /**
  * Trigger physical haptic vibration for mobile web and mobile apps
  */
-export function triggerHaptic(pattern: number[] = [120, 80, 180]): void {
+export async function triggerHaptic(type: 'success' | 'warning' | 'error' | 'light' | 'medium' | 'heavy' = 'light'): Promise<void> {
+  if (typeof window !== 'undefined' && (window as any).Capacitor) {
+    try {
+      switch (type) {
+        case 'success':
+          await Haptics.notification({ type: NotificationType.Success });
+          break;
+        case 'warning':
+          await Haptics.notification({ type: NotificationType.Warning });
+          break;
+        case 'error':
+          await Haptics.notification({ type: NotificationType.Error });
+          break;
+        case 'heavy':
+          await Haptics.impact({ style: ImpactStyle.Heavy });
+          break;
+        case 'medium':
+          await Haptics.impact({ style: ImpactStyle.Medium });
+          break;
+        default:
+          await Haptics.impact({ style: ImpactStyle.Light });
+      }
+    } catch {
+      // Fallback or ignore
+    }
+    return;
+  }
+
   if (typeof window !== 'undefined' && 'navigator' in window && 'vibrate' in navigator) {
     try {
-      navigator.vibrate(pattern);
+      const legacyPattern = type === 'success' ? [100, 50, 100] : [100];
+      navigator.vibrate(legacyPattern);
     } catch {
       // Vibration not permitted or supported on device
     }
@@ -280,7 +309,7 @@ export async function requestNotificationPermission(): Promise<'granted' | 'deni
     if (permission === 'granted') {
       // Play confirmation chime & haptic
       playSynthesizedChime('cash');
-      triggerHaptic([100, 50, 100, 50, 150]);
+      triggerHaptic('success');
 
       // Dispatch real Native System Push Notification
       setTimeout(() => {
@@ -316,7 +345,7 @@ export async function sendNativePushNotification(
 ): Promise<boolean> {
   // Always trigger audio chime and haptic if sound enabled
   playSynthesizedChime(type === 'danger' || type === 'warning' ? 'alert' : 'cash');
-  triggerHaptic(type === 'danger' ? [200, 100, 200] : [120, 80]);
+  triggerHaptic(type === 'danger' ? 'error' : 'medium');
 
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return false;

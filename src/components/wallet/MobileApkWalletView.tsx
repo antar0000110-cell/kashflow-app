@@ -108,11 +108,11 @@ export const MobileApkWalletView: React.FC = () => {
     const cleanNumber = walletNumberInput.trim();
     if (!cleanNumber || cleanNumber.length < 9) {
       setLoginError('Please enter a valid 11-digit mobile wallet number');
-      triggerHaptic([40, 40, 40]);
+      triggerHaptic("light");
       return;
     }
 
-    triggerHaptic([30]);
+    triggerHaptic("light");
     // Save to history cache
     const updatedList = Array.from(new Set([cleanNumber, ...savedWallets])).slice(0, 10);
     setSavedWallets(updatedList);
@@ -133,11 +133,11 @@ export const MobileApkWalletView: React.FC = () => {
     // Accept 6-digit code (any 6 digits or standard code)
     if (otpInput.length < 4) {
       setLoginError('Please enter the 6-digit OTP code');
-      triggerHaptic([40, 40, 40]);
+      triggerHaptic("light");
       return;
     }
 
-    triggerHaptic([50, 50]);
+    triggerHaptic("light");
     playSynthesizedChime('cash');
     setActiveWalletNumber(walletNumberInput);
     setIsLoggedIn(true);
@@ -146,7 +146,7 @@ export const MobileApkWalletView: React.FC = () => {
   };
 
   const handleLogout = () => {
-    triggerHaptic([30]);
+    triggerHaptic("light");
     setIsLoggedIn(false);
     setLoginStep('enter_number');
     setOtpInput('');
@@ -155,7 +155,7 @@ export const MobileApkWalletView: React.FC = () => {
 
   const handleCopyPhone = () => {
     navigator.clipboard.writeText(activeWalletNumber);
-    triggerHaptic([25]);
+    triggerHaptic("light");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -163,7 +163,7 @@ export const MobileApkWalletView: React.FC = () => {
   const handleDepositSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (depositAmount <= 0) return;
-    triggerHaptic([50, 40, 70]);
+    triggerHaptic("light");
     playSynthesizedChime('cash');
     setDepositSuccess(true);
     sendNativePushNotification(
@@ -181,7 +181,7 @@ export const MobileApkWalletView: React.FC = () => {
   const handleWithdrawSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (withdrawAmount <= 0 || withdrawAmount > userBalance) return;
-    triggerHaptic([60, 50, 80]);
+    triggerHaptic("light");
     playSynthesizedChime('cash');
     setWithdrawSuccess(true);
     sendNativePushNotification(
@@ -207,11 +207,11 @@ export const MobileApkWalletView: React.FC = () => {
     const result = transferBetweenWallets(activeWalletNumber, transferTarget, Number(transferAmount));
     if (!result.success) {
       setTransferError(result.error || result.message || 'فشلت عملية التحويل');
-      triggerHaptic([50, 50, 50]);
+      triggerHaptic("light");
       return;
     }
 
-    triggerHaptic([70, 50, 100]);
+    triggerHaptic("light");
     playSynthesizedChime('cash');
     setTransferSuccess(true);
     sendNativePushNotification(
@@ -261,7 +261,7 @@ export const MobileApkWalletView: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                triggerHaptic([20]);
+                triggerHaptic("light");
                 setIsNotificationModalOpen(true);
               }}
               className="p-1 rounded text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
@@ -435,7 +435,7 @@ export const MobileApkWalletView: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => {
-                    triggerHaptic([20]);
+                    triggerHaptic("light");
                     setIsNotificationModalOpen(true);
                   }}
                   className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-rose-100 flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer"
@@ -466,7 +466,7 @@ export const MobileApkWalletView: React.FC = () => {
                       <span className="font-medium">Available Balance</span>
                       <button
                         onClick={() => {
-                          triggerHaptic([15]);
+                          triggerHaptic("light");
                           setShowBalance(!showBalance);
                         }}
                         className="p-1 text-rose-200 hover:text-white cursor-pointer"
@@ -493,7 +493,7 @@ export const MobileApkWalletView: React.FC = () => {
                     {/* 1. Cash In */}
                     <button
                       onClick={() => {
-                        triggerHaptic([25]);
+                        triggerHaptic("light");
                         setActiveTab('deposit');
                       }}
                       className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs hover:bg-slate-50 transition-colors flex flex-col items-center gap-1.5 group cursor-pointer"
@@ -508,7 +508,7 @@ export const MobileApkWalletView: React.FC = () => {
                     {/* 2. Cash Out */}
                     <button
                       onClick={() => {
-                        triggerHaptic([25]);
+                        triggerHaptic("light");
                         setActiveTab('withdraw');
                       }}
                       className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs hover:bg-slate-50 transition-colors flex flex-col items-center gap-1.5 group cursor-pointer"
@@ -523,7 +523,7 @@ export const MobileApkWalletView: React.FC = () => {
                     {/* 3. Transfer */}
                     <button
                       onClick={() => {
-                        triggerHaptic([25]);
+                        triggerHaptic("light");
                         setActiveTab('transfer');
                       }}
                       className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs hover:bg-slate-50 transition-colors flex flex-col items-center gap-1.5 group cursor-pointer"
@@ -559,7 +559,7 @@ export const MobileApkWalletView: React.FC = () => {
                       </span>
                       <button
                         onClick={() => {
-                          triggerHaptic([20]);
+                          triggerHaptic("light");
                           setActiveTab('history');
                         }}
                         className="text-[11px] text-[#8B1E2D] font-bold hover:underline cursor-pointer"
@@ -573,7 +573,7 @@ export const MobileApkWalletView: React.FC = () => {
                         <div
                           key={tx.id}
                           onClick={() => {
-                            triggerHaptic([20]);
+                            triggerHaptic("light");
                             setSelectedTxDetail(tx);
                           }}
                           className="p-3 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors"
@@ -628,7 +628,7 @@ export const MobileApkWalletView: React.FC = () => {
                     </h3>
                     <button
                       onClick={() => {
-                        triggerHaptic([20]);
+                        triggerHaptic("light");
                         setActiveTab('home');
                       }}
                       className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
@@ -687,7 +687,7 @@ export const MobileApkWalletView: React.FC = () => {
                     </h3>
                     <button
                       onClick={() => {
-                        triggerHaptic([20]);
+                        triggerHaptic("light");
                         setActiveTab('home');
                       }}
                       className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
@@ -748,7 +748,7 @@ export const MobileApkWalletView: React.FC = () => {
                     </h3>
                     <button
                       onClick={() => {
-                        triggerHaptic([20]);
+                        triggerHaptic("light");
                         setActiveTab('home');
                       }}
                       className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
@@ -815,7 +815,7 @@ export const MobileApkWalletView: React.FC = () => {
                     </h3>
                     <button
                       onClick={() => {
-                        triggerHaptic([20]);
+                        triggerHaptic("light");
                         setActiveTab('home');
                       }}
                       className="text-xs text-slate-500 hover:text-slate-800 font-semibold cursor-pointer"
@@ -846,7 +846,7 @@ export const MobileApkWalletView: React.FC = () => {
                         <div
                           key={tx.id}
                           onClick={() => {
-                            triggerHaptic([20]);
+                            triggerHaptic("light");
                             setSelectedTxDetail(tx);
                           }}
                           className="p-3 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors text-xs"
@@ -879,7 +879,7 @@ export const MobileApkWalletView: React.FC = () => {
             <div className="px-4 py-2.5 bg-white border-t border-slate-200 flex items-center justify-around text-slate-500 shrink-0 select-none">
               <button
                 onClick={() => {
-                  triggerHaptic([20]);
+                  triggerHaptic("light");
                   setActiveTab('home');
                 }}
                 className={`flex flex-col items-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
@@ -892,7 +892,7 @@ export const MobileApkWalletView: React.FC = () => {
 
               <button
                 onClick={() => {
-                  triggerHaptic([20]);
+                  triggerHaptic("light");
                   setActiveTab('transfer');
                 }}
                 className={`flex flex-col items-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
@@ -905,7 +905,7 @@ export const MobileApkWalletView: React.FC = () => {
 
               <button
                 onClick={() => {
-                  triggerHaptic([20]);
+                  triggerHaptic("light");
                   setActiveTab('deposit');
                 }}
                 className={`flex flex-col items-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
@@ -918,7 +918,7 @@ export const MobileApkWalletView: React.FC = () => {
 
               <button
                 onClick={() => {
-                  triggerHaptic([20]);
+                  triggerHaptic("light");
                   setActiveTab('history');
                 }}
                 className={`flex flex-col items-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
@@ -967,7 +967,7 @@ export const MobileApkWalletView: React.FC = () => {
 
             <button
               onClick={() => {
-                triggerHaptic([15]);
+                triggerHaptic("light");
                 setSelectedTxDetail(null);
               }}
               className="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold cursor-pointer"

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useNativeApp } from './hooks/useNativeApp';
 import { useAppStore } from './store/useAppStore';
 import { LoginView } from './components/auth/LoginView';
 import { AdminLayout } from './layouts/AdminLayout';
@@ -18,6 +19,9 @@ import { DomainSettingsView } from './components/settings/DomainSettingsView';
 import { NotificationPermissionModal } from './components/notifications/NotificationPermissionModal';
 
 export function App() {
+  // Initialize Capacitor-specific native behaviors
+  useNativeApp();
+
   const {
     authRole,
     activePortal,

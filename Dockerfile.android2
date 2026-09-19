@@ -1,0 +1,26 @@
+# Android Build Dockerfile for KashFlow APK - Using official Android image
+FROM ghcr.io/cirruslabs/android-sdk:34
+
+# Install Node.js 20
+RUN apt-get update && apt-get install -y \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Capacitor CLI globally
+RUN npm install -g @capacitor/cli @capacitor/core @capacitor/android
+
+WORKDIR /app
+
+# Copy project files
+COPY package*.json ./
+COPY capacitor.config.json ./
+COPY build-apk-docker.sh ./
+COPY kashflow-release.keystore ./
+
+# Make build script executable
+RUN chmod +x build-apk-docker.sh
+
+# Default command
+CMD ["./build-apk-docker.sh"]

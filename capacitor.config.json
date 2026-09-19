@@ -2,7 +2,24 @@
   "appId": "com.kashflow.wallet",
   "appName": "KashFlow Wallet",
   "webDir": "dist",
-  "bundledWebRuntime": false,
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#8B1E2D",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": true,
+      "androidSpinnerStyle": "large",
+      "iosSpinnerStyle": "small",
+      "spinnerColor": "#ffffff"
+    },
+    "StatusBar": {
+      "overlaysWebView": false,
+      "backgroundColor": "#8B1E2D",
+      "style": "DARK"
+    }
+  },
   "server": {
     "androidScheme": "https",
     "cleartext": true
