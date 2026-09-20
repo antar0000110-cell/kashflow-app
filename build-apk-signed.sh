@@ -139,6 +139,16 @@ fi
 echo -e "${BLUE}Syncing production assets with Capacitor Android wrapper...${NC}"
 npx cap sync android
 
+# F. Copying custom high-quality UZX Wallet logo as Launcher Icon
+echo -e "${BLUE}Injecting official UZX Wallet launcher icons and round adaptive icons...${NC}"
+for dir in mipmap-hdpi mipmap-mdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi; do
+    mkdir -p "android/app/src/main/res/$dir"
+    cp "public/uzx-logo.png" "android/app/src/main/res/$dir/ic_launcher.png"
+    cp "public/uzx-logo.png" "android/app/src/main/res/$dir/ic_launcher_round.png"
+    cp "public/uzx-logo.png" "android/app/src/main/res/$dir/ic_launcher_foreground.png"
+done
+echo -e "${GREEN}[✔] Launcher icons updated successfully with the official UZX logo.${NC}"
+
 # ------------------------------------------------------------------------------
 # STEP 3: Smart Interactivity for Keystore & Signing Configuration
 # ------------------------------------------------------------------------------
@@ -146,22 +156,22 @@ if [ "$HAS_JAVA" = true ]; then
     print_header "STEP 3: Configuring Release Signing Keystore"
 
     echo -e "${CYAN}Please configure your secure signing credentials.${NC}"
-    echo -e "Leaving these empty will apply KashFlow official secure defaults."
+    echo -e "Leaving these empty will apply ZUX official secure defaults."
     echo ""
 
     # Keystore filename
-    read -p "1. Enter keystore filename [kashflow-release.keystore]: " USER_KEYSTORE
-    KEYSTORE_FILE=${USER_KEYSTORE:-"kashflow-release.keystore"}
+    read -p "1. Enter keystore filename [zux-release.keystore]: " USER_KEYSTORE
+    KEYSTORE_FILE=${USER_KEYSTORE:-"zux-release.keystore"}
 
     # Key alias
-    read -p "2. Enter key alias [kashflow_key]: " USER_ALIAS
-    KEY_ALIAS=${USER_ALIAS:-"kashflow_key"}
+    read -p "2. Enter key alias [zux_key]: " USER_ALIAS
+    KEY_ALIAS=${USER_ALIAS:-"zux_key"}
 
     # Store pass (minimum 6 characters)
     while true; do
-        read -s -p "3. Enter keystore password (min 6 characters) [KashFlow2026SecurePass!]: " USER_PASS
+        read -s -p "3. Enter keystore password (min 6 characters) [ZUX2026SecurePass!]: " USER_PASS
         echo ""
-        STORE_PASS=${USER_PASS:-"KashFlow2026SecurePass!"}
+        STORE_PASS=${USER_PASS:-"ZUX2026SecurePass!"}
         if [ ${#STORE_PASS} -lt 6 ]; then
             echo -e "${RED}[ERROR] Password must be at least 6 characters. Please try again.${NC}"
         else
@@ -170,13 +180,13 @@ if [ "$HAS_JAVA" = true ]; then
     done
 
     # DNAME details for Certificate Authority
-    read -p "4. Enter your Organization Name [KashFlow Agency]: " ORG_NAME
-    ORG_NAME=${ORG_NAME:-"KashFlow Agency"}
+    read -p "4. Enter your Organization Name [ZUX Agency]: " ORG_NAME
+    ORG_NAME=${ORG_NAME:-"ZUX Agency"}
 
     read -p "5. Enter two-letter Country Code (e.g. EG, US, SA) [EG]: " COUNTRY_CODE
     COUNTRY_CODE=${COUNTRY_CODE:-"EG"}
 
-    DNAME_STRING="CN=KashFlow Security, OU=FinTech Ops, O=${ORG_NAME}, L=Cairo, ST=Cairo, C=${COUNTRY_CODE}"
+    DNAME_STRING="CN=ZUX Security, OU=FinTech Ops, O=${ORG_NAME}, L=Cairo, ST=Cairo, C=${COUNTRY_CODE}"
 
     # Generate the keystore file if it doesn't exist
     if [ ! -f "$KEYSTORE_FILE" ]; then
@@ -245,8 +255,8 @@ if [ "$GRADLE_SUCCESS" = true ] && [ "$HAS_JAVA" = true ]; then
     print_header "STEP 5: Official Code Signing & Integrity Verification"
 
     UNSIGNED_APK="android/app/build/outputs/apk/release/app-release-unsigned.apk"
-    SIGNED_APK="kashflow-wallet-signed.apk"
-    ALIGNED_APK="kashflow-wallet-aligned.apk"
+    SIGNED_APK="zux-wallet-signed.apk"
+    ALIGNED_APK="zux-wallet-aligned.apk"
 
     if [ -f "$UNSIGNED_APK" ]; then
         echo -e "${BLUE}Found unsigned production APK at: $UNSIGNED_APK${NC}"
@@ -310,8 +320,8 @@ if [ "$GRADLE_SUCCESS" = true ] && [ "$HAS_JAVA" = true ]; then
             echo -e "${BOLD}${GREEN}  🏆 SUCCESS: OFFICIAL SIGNED PRODUCTION APK GENERATED SUCCESSFULLY!  ${NC}"
             echo -e "${BOLD}${GREEN}======================================================================${NC}"
             echo -e "  📌 ${BOLD}Output File:${NC}  $SIGNED_APK"
-            echo -e "  📌 ${BOLD}App Bundle ID:${NC} com.kashflow.wallet"
-            echo -e "  📌 ${BOLD}App Name:${NC}      KashFlow Wallet"
+            echo -e "  📌 ${BOLD}App Bundle ID:${NC} com.zux.wallet"
+            echo -e "  📌 ${BOLD}App Name:${NC}      ZUX Wallet"
             echo -e "  📌 ${BOLD}Keystore File:${NC} $KEYSTORE_FILE"
             echo -e "  📌 ${BOLD}Key Alias:${NC}     $KEY_ALIAS"
             echo -e "  📌 ${BOLD}Certificate:${NC}   2048-bit RSA (Google Play Store Compliant)"

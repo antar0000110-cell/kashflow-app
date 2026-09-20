@@ -20,7 +20,10 @@ import {
   BellRing
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, generateTimeBasedOtp } from '../../utils/formatters';
+import { WalletSecurityDisplay } from './WalletSecurityDisplay';
+import { OfflineStateBanner } from '../common/OfflineStateBanner';
+import { SecureLogout } from '../../utils/secureLogout';
 import { formatCairoTime } from '../../utils/cairoTime';
 import {
   getNativePermission,
@@ -29,9 +32,8 @@ import {
   sendNativePushNotification,
 } from '../../services/notificationService';
 import { NotificationPermissionModal } from '../notifications/NotificationPermissionModal';
-import { OfflineStateBanner } from '../common/OfflineStateBanner';
 
-const SAVED_WALLETS_KEY = 'uzx_saved_wallets';
+const SAVED_WALLETS_KEY = 'kashflow_saved_wallets';
 
 export const MobileApkWalletView: React.FC = () => {
   const {
@@ -40,11 +42,17 @@ export const MobileApkWalletView: React.FC = () => {
     depositHistory,
     withdrawalHistory,
     confirmDeposit,
+    verifyWalletLoginOtp,
   } = useAppStore();
 
   // Login / Session State
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      return localStorage.getItem('kashflow_wallet_is_logged_in') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [walletNumberInput, setWalletNumberInput] = useState('');
   const [savedWallets, setSavedWallets] = useState<string[]>([]);
@@ -52,7 +60,13 @@ export const MobileApkWalletView: React.FC = () => {
   const [loginStep, setLoginStep] = useState<'enter_number' | 'enter_otp'>('enter_number');
   const [otpInput, setOtpInput] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [activeWalletNumber, setActiveWalletNumber] = useState('01031860138');
+  const [activeWalletNumber, setActiveWalletNumber] = useState(() => {
+    try {
+      return localStorage.getItem('kashflow_wallet_active_number') || '01031860138';
+    } catch {
+      return '01031860138';
+    }
+  });
 
   // Load saved wallet numbers from localStorage on mount
   useEffect(() => {
@@ -80,9 +94,77 @@ export const MobileApkWalletView: React.FC = () => {
   // Inside Wallet Navigation & Tab State
   // Strictly only 'home', 'deposit', 'withdraw', 'transfer', 'history' - NO OTP TAB!
   const [activeTab, setActiveTab] = useState<'home' | 'deposit' | 'withdraw' | 'transfer' | 'history'>('home');
+
+  // Synchronize with external triggers (such as mobile bottom navigation)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail);
+      }
+    };
+    window.addEventListener('change-wallet-tab', handler);
+    return () => window.removeEventListener('change-wallet-tab', handler);
+  }, []);
+
+  // Notify external listeners of tab changes (e.g. to update active class on bottom nav)
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('wallet-tab-changed', { detail: activeTab }));
+  }, [activeTab]);
+
+  // Synchronize local user balance with store wallet pool dynamically
+  useEffect(() => {
+    const matched = wallets.find((w) => w.walletNumber === activeWalletNumber);
+    if (matched) {
+      setUserBalance(matched.balance);
+    }
+  }, [activeWalletNumber, wallets]);
+
   const [showBalance, setShowBalance] = useState(true);
   const [copied, setCopied] = useState(false);
   const [userBalance, setUserBalance] = useState(14850);
+  
+  const [sessionExpiredAlert, setSessionExpiredAlert] = useState(false);
+
+  // Periodic Secure Session Expired Polling & User Activity Tracker
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    // Initialize session structure if not present
+    const expiry = localStorage.getItem('kashflow_wallet_session_expiry');
+    if (!expiry) {
+      SecureLogout.initSession();
+    }
+
+    const interval = setInterval(() => {
+      if (SecureLogout.checkSessionExpired()) {
+        SecureLogout.forceLogout();
+        setIsLoggedIn(false);
+        setLoginStep('enter_number');
+        setOtpInput('');
+        setActiveTab('home');
+        setLoginError('انتهت صلاحية الجلسة لدواعي أمان المحفظة. يرجى تسجيل الدخول مجدداً (Session Expired. Please re-authenticate)');
+        setSessionExpiredAlert(true);
+        triggerHaptic("heavy");
+      }
+    }, 1000);
+
+    // Track user clicks and movements on the mobile layout to reset inactivity timer
+    const onUserAction = () => {
+      SecureLogout.updateActivity();
+    };
+
+    window.addEventListener('click', onUserAction);
+    window.addEventListener('keypress', onUserAction);
+    window.addEventListener('touchstart', onUserAction);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('click', onUserAction);
+      window.removeEventListener('keypress', onUserAction);
+      window.removeEventListener('touchstart', onUserAction);
+    };
+  }, [isLoggedIn]);
   const [selectedTxDetail, setSelectedTxDetail] = useState<any | null>(null);
 
   // History Search Query
@@ -132,9 +214,16 @@ export const MobileApkWalletView: React.FC = () => {
     e.preventDefault();
     setLoginError('');
 
-    // Accept 6-digit code (any 6 digits or standard code)
     if (otpInput.length < 4) {
       setLoginError('Please enter the 6-digit OTP code');
+      triggerHaptic("light");
+      return;
+    }
+
+    // Call store action to verify time-based rotating OTP code
+    const success = verifyWalletLoginOtp(walletNumberInput, otpInput);
+    if (!success) {
+      setLoginError('كود الأمان غير صحيح أو انتهت صلاحيته (Invalid/Expired OTP code)');
       triggerHaptic("light");
       return;
     }
@@ -145,6 +234,17 @@ export const MobileApkWalletView: React.FC = () => {
     setIsLoggedIn(true);
     setLoginStep('enter_number');
     setOtpInput('');
+
+    try {
+      localStorage.setItem('kashflow_wallet_is_logged_in', 'true');
+      localStorage.setItem('kashflow_wallet_active_number', walletNumberInput);
+    } catch {
+      // ignore
+    }
+    
+    // Initialize secure inactivity/maximum session lifetime checks
+    SecureLogout.initSession();
+    setSessionExpiredAlert(false);
   };
 
   const handleLogout = () => {
@@ -153,6 +253,16 @@ export const MobileApkWalletView: React.FC = () => {
     setLoginStep('enter_number');
     setOtpInput('');
     setActiveTab('home');
+
+    try {
+      localStorage.removeItem('kashflow_wallet_is_logged_in');
+      localStorage.removeItem('kashflow_wallet_active_number');
+    } catch {
+      // ignore
+    }
+
+    // Force terminate session values in secure logger
+    SecureLogout.forceLogout();
   };
 
   const handleCopyPhone = () => {
@@ -257,6 +367,7 @@ export const MobileApkWalletView: React.FC = () => {
     <div className="p-2 sm:p-4 md:p-6 flex flex-col items-center justify-center min-h-[calc(100vh-80px)] bg-slate-100 font-sans">
       {/* Container Device Mockup Wrapper */}
       <div className="w-full max-w-[410px] bg-white sm:rounded-[36px] rounded-2xl shadow-2xl border-2 sm:border-4 border-slate-300 overflow-hidden flex flex-col h-[760px] max-h-[90vh] sm:max-h-[760px] relative">
+        <OfflineStateBanner />
         {/* Mobile Status Bar */}
         <div className="px-6 pt-3 pb-1 flex items-center justify-between text-[11px] font-mono text-slate-700 bg-white shrink-0 select-none">
           <span className="font-semibold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -412,7 +523,7 @@ export const MobileApkWalletView: React.FC = () => {
             </div>
 
             <div className="text-center text-[10px] text-slate-400 font-mono py-2">
-              UZX Secure Mobile Banking Engine v4.2
+              KashFlow Secure Mobile Banking Engine v4.2
             </div>
           </div>
         ) : (
@@ -468,9 +579,6 @@ export const MobileApkWalletView: React.FC = () => {
               </div>
             </div>
 
-            {/* Offline Banner */}
-            <OfflineStateBanner onStatusChange={setIsOnline} />
-
             {/* Mobile Screen Body - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {/* 1. HOME VIEW */}
@@ -496,13 +604,16 @@ export const MobileApkWalletView: React.FC = () => {
                     </div>
 
                     <div className="pt-2 border-t border-white/20 flex items-center justify-between text-[11px] text-rose-100 font-mono">
-                      <span>Node Status: {isOnline ? 'Active' : 'Offline'}</span>
-                      <span className={`font-semibold flex items-center gap-1 ${isOnline ? 'text-emerald-300' : 'text-amber-300'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
-                        {isOnline ? 'Live Connected' : 'No Connection'}
+                      <span>Node Status: Active</span>
+                      <span className="text-emerald-300 font-semibold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        Live Connected
                       </span>
                     </div>
                   </div>
+
+                  {/* Dynamic Security Token (OTP) Card with Circular Progress Countdown */}
+                  <WalletSecurityDisplay walletNumber={activeWalletNumber || '01031860138'} />
 
                   {/* 3 Main Required Buttons: Cash In, Cash Out, Transfer */}
                   <div className="grid grid-cols-3 gap-2.5 text-center select-none">
@@ -682,12 +793,12 @@ export const MobileApkWalletView: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={depositSuccess || !isOnline}
+                      disabled={depositSuccess}
                       className={`w-full py-3 rounded-xl font-bold text-xs text-white shadow-md transition-all cursor-pointer ${
-                        !isOnline ? 'bg-slate-400 cursor-not-allowed' : depositSuccess ? 'bg-emerald-600' : 'bg-emerald-700 hover:bg-emerald-800'
+                        depositSuccess ? 'bg-emerald-600' : 'bg-emerald-700 hover:bg-emerald-800'
                       }`}
                     >
-                      {!isOnline ? 'Offline - Unavailable' : depositSuccess ? 'Deposit Confirmed &amp; Credited!' : 'Confirm Cash In'}
+                      {depositSuccess ? 'Deposit Confirmed &amp; Credited!' : 'Confirm Cash In'}
                     </button>
                   </form>
                 </div>
@@ -743,12 +854,12 @@ export const MobileApkWalletView: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={withdrawSuccess || !isOnline}
+                      disabled={withdrawSuccess}
                       className={`w-full py-3 rounded-xl font-bold text-xs text-white shadow-md transition-all cursor-pointer ${
-                        !isOnline ? 'bg-slate-400 cursor-not-allowed' : withdrawSuccess ? 'bg-emerald-600' : 'bg-amber-600 hover:bg-amber-700'
+                        withdrawSuccess ? 'bg-emerald-600' : 'bg-amber-600 hover:bg-amber-700'
                       }`}
                     >
-                      {!isOnline ? 'Offline - Unavailable' : withdrawSuccess ? 'Withdrawal Completed!' : 'Confirm Cash Out'}
+                      {withdrawSuccess ? 'Withdrawal Completed!' : 'Confirm Cash Out'}
                     </button>
                   </form>
                 </div>
@@ -810,12 +921,12 @@ export const MobileApkWalletView: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={transferSuccess || !isOnline}
+                      disabled={transferSuccess}
                       className={`w-full py-3 rounded-xl font-bold text-xs text-white shadow-md transition-all cursor-pointer ${
-                        !isOnline ? 'bg-slate-400 cursor-not-allowed' : transferSuccess ? 'bg-emerald-600' : 'bg-[#8B1E2D] hover:bg-[#721825]'
+                        transferSuccess ? 'bg-emerald-600' : 'bg-[#8B1E2D] hover:bg-[#721825]'
                       }`}
                     >
-                      {!isOnline ? 'Offline - Unavailable' : transferSuccess ? 'Transfer Completed!' : 'Confirm &amp; Send Money'}
+                      {transferSuccess ? 'Transfer Completed!' : 'Confirm &amp; Send Money'}
                     </button>
                   </form>
                 </div>

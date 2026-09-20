@@ -21,10 +21,11 @@ import {
   initialAgentDepositRequests,
   SIMULATION_WALLET_POOL
 } from '../services/mockData';
-import { generateOtpCode, generateRandomId, generateHash } from '../utils/formatters';
+import { generateOtpCode, generateRandomId, generateHash, generateTimeBasedOtp } from '../utils/formatters';
 import { formatCairoTime } from '../utils/cairoTime';
 import { soundManager } from '../utils/soundAlerts';
 import { sendNativePushNotification } from '../services/notificationService';
+import { socketService } from '../services/socketService';
 
 export type AppSection =
   | 'dashboard'
@@ -67,6 +68,8 @@ export interface AppStoreState {
   // Navigation & Auth
   authRole: 'guest' | 'admin' | 'agent';
   currentUser: { username: string; role: 'admin' | 'agent'; agentId?: string; agentName?: string } | null;
+  isAuthenticated: boolean;
+  setIsAuthenticated: (auth: boolean) => void;
   activeSection: AppSection;
   activePortal: 'admin' | 'agent' | 'wallet-apk';
   selectedAgentId: string;
@@ -199,20 +202,23 @@ export interface AppStoreState {
 }
 
 const mapWalletsWithAliases = (rawWallets: Wallet[]): Wallet[] => {
-  return rawWallets.map((w) => ({
-    ...w,
-    phoneNumber: w.phoneNumber || w.walletNumber || w.accountNumber || '',
-    accountNumber: w.accountNumber || w.walletNumber,
-    accountHolder: w.accountHolder || (w.agentName ? `Agent: ${w.agentName}` : 'Central Wallet Pool'),
-    provider: w.provider || 'Vodafone Cash',
-    assignedAgentId: w.assignedAgentId !== undefined ? w.assignedAgentId : w.agentId,
-    assignedAgentName: w.assignedAgentName || w.agentName,
-    otpCode: w.otpCode || w.currentOtp || generateOtpCode(),
-    lastOtp: w.lastOtp || w.otpCode || w.currentOtp || generateOtpCode(),
-    dailyLimit: w.dailyLimit !== undefined ? w.dailyLimit : w.dailySendLimit,
-    singleTransactionLimit: w.singleTransactionLimit !== undefined ? w.singleTransactionLimit : w.maxSingleLimit,
-    todayTransferred: w.todayTransferred !== undefined ? w.todayTransferred : w.todaySent,
-  }));
+  return rawWallets.map((w) => {
+    const activeOtp = generateTimeBasedOtp(w.walletNumber || w.phoneNumber || w.accountNumber || '');
+    return {
+      ...w,
+      phoneNumber: w.phoneNumber || w.walletNumber || w.accountNumber || '',
+      accountNumber: w.accountNumber || w.walletNumber,
+      accountHolder: w.accountHolder || (w.agentName ? `Agent: ${w.agentName}` : 'Central Wallet Pool'),
+      provider: w.provider || 'Vodafone Cash',
+      assignedAgentId: w.assignedAgentId !== undefined ? w.assignedAgentId : w.agentId,
+      assignedAgentName: w.assignedAgentName || w.agentName,
+      otpCode: activeOtp,
+      lastOtp: activeOtp,
+      dailyLimit: w.dailyLimit !== undefined ? w.dailyLimit : w.dailySendLimit,
+      singleTransactionLimit: w.singleTransactionLimit !== undefined ? w.singleTransactionLimit : w.maxSingleLimit,
+      todayTransferred: w.todayTransferred !== undefined ? w.todayTransferred : w.todaySent,
+    };
+  });
 };
 
 const mapAgentsWithAliases = (rawAgents: Agent[]): Agent[] => {
@@ -231,9 +237,88 @@ const mapAgentsWithAliases = (rawAgents: Agent[]): Agent[] => {
   }));
 };
 
-export const useAppStore = create<AppStoreState>((set, get) => ({
+const PERSISTENCE_KEY = 'uzx_store_persist';
+
+interface PersistedStoreData {
+  banks: BankAccount[];
+  pendingDeposits: Transaction[];
+  depositHistory: Transaction[];
+  pendingWithdrawals: Transaction[];
+  withdrawalHistory: Transaction[];
+  agents: Agent[];
+  wallets: Wallet[];
+  agentDepositRequests: AgentDepositRequest[];
+  agentPayouts: AgentPayout[];
+  domainSettings: DomainSettings;
+  commissionRates: { depositCommissionPercent: number; withdrawalCommissionPercent: number };
+  paymentMethods: string[];
+  totalSimulatedWalletsCount: number;
+  globalTrafficActive: boolean;
+  soundEnabled: boolean;
+}
+
+function loadPersistedData(): Partial<PersistedStoreData> | null {
+  try {
+    const raw = localStorage.getItem(PERSISTENCE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.agents && parsed.wallets) {
+      console.log('[UZX Persistence] Loaded store data from localStorage');
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function persistStoreData(state: Partial<AppStoreState>): void {
+  try {
+    const data: PersistedStoreData = {
+      banks: state.banks!,
+      pendingDeposits: state.pendingDeposits!,
+      depositHistory: state.depositHistory!,
+      pendingWithdrawals: state.pendingWithdrawals!,
+      withdrawalHistory: state.withdrawalHistory!,
+      agents: state.agents!,
+      wallets: state.wallets!,
+      agentDepositRequests: state.agentDepositRequests!,
+      agentPayouts: state.agentPayouts!,
+      domainSettings: state.domainSettings!,
+      commissionRates: state.commissionRates!,
+      paymentMethods: state.paymentMethods!,
+      totalSimulatedWalletsCount: state.totalSimulatedWalletsCount!,
+      globalTrafficActive: state.globalTrafficActive!,
+      soundEnabled: state.soundEnabled!,
+    };
+    localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('[UZX Persistence] Failed to save store data:', e);
+  }
+}
+
+export const useAppStore = create<AppStoreState>((set, get) => {
+  const persisted = loadPersistedData();
+
+  const initBanks = persisted?.banks ?? initialBanks;
+  const initPendingDeposits = persisted?.pendingDeposits ?? initialPendingDeposits;
+  const initDepositHistory = persisted?.depositHistory ?? initialHistoricalTransactions.filter((t) => t.type === 'deposit');
+  const initPendingWithdrawals = persisted?.pendingWithdrawals ?? initialPendingWithdrawals;
+  const initWithdrawalHistory = persisted?.withdrawalHistory ?? initialHistoricalTransactions.filter((t) => t.type === 'withdrawal');
+  const initAgents = persisted?.agents ?? mapAgentsWithAliases(initialAgents);
+  const initWallets = persisted?.wallets ?? mapWalletsWithAliases(initialWallets);
+  const initAgentDepositRequests = persisted?.agentDepositRequests ?? initialAgentDepositRequests.map((r) => ({
+    ...r,
+    requestedAmount: r.requestedAmount || r.amountRequested,
+    txReference: r.txReference || r.referenceNumber,
+  }));
+
+  return {
+
   authRole: 'guest',
   currentUser: null,
+  isAuthenticated: false,
+  setIsAuthenticated: (auth) => set({ isAuthenticated: auth }),
   activeSection: 'dashboard',
   activePortal: 'admin',
   selectedAgentId: 'AGT-01',
@@ -248,12 +333,17 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     // 1. Check Master Admin Credentials
     if (cleanUser === 'admin' || cleanUser === 'master' || cleanUser === 'administrator' || (cleanUser === 'admin' && cleanPass === 'admin123')) {
       const userObj = { username: 'Master Admin', role: 'admin' as const };
+      localStorage.setItem('uzx_auth_role', 'admin');
+      localStorage.setItem('uzx_session_token', 'admin_session_token');
       set({
         authRole: 'admin',
         currentUser: userObj,
+        isAuthenticated: true,
         activePortal: 'admin',
         activeSection: 'dashboard',
       });
+      // Subscribe socket to admin channel upon login
+      socketService.connect('admin');
       return { success: true, role: 'admin' };
     }
 
@@ -275,13 +365,18 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         agentId: matchedAgent.id,
         agentName: matchedAgent.name,
       };
+      localStorage.setItem('uzx_auth_role', 'agent');
+      localStorage.setItem('uzx_session_token', `agent_session_token_${matchedAgent.id}`);
       set({
         authRole: 'agent',
         currentUser: userObj,
+        isAuthenticated: true,
         selectedAgentId: matchedAgent.id,
         activePortal: 'agent',
         activeSection: 'agent-portal',
       });
+      // Subscribe socket to specific agent user ID upon login
+      socketService.connect(matchedAgent.id);
       return { success: true, role: 'agent' };
     }
 
@@ -292,9 +387,13 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   },
 
   logout: () => {
+    localStorage.removeItem('uzx_auth_role');
+    localStorage.removeItem('uzx_session_token');
+    socketService.disconnect();
     set({
       authRole: 'guest',
       currentUser: null,
+      isAuthenticated: false,
       activePortal: 'admin',
       activeSection: 'dashboard',
       isMobileDrawerOpen: false,
@@ -315,25 +414,14 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   supportedCurrencies: ['EGP', 'USD', 'USDT', 'SAR', 'AED'],
   paymentMethods: ['Vodafone Cash', 'InstaPay', 'Orange Cash', 'Etisalat Cash', 'WE Pay', 'Bank Transfer'],
 
-  banks: initialBanks,
-  pendingDeposits: initialPendingDeposits,
-  depositHistory: initialHistoricalTransactions.filter((t) => t.type === 'deposit'),
-  pendingWithdrawals: initialPendingWithdrawals,
-  withdrawalHistory: initialHistoricalTransactions.filter((t) => t.type === 'withdrawal'),
-  agents: mapAgentsWithAliases(initialAgents),
-  wallets: mapWalletsWithAliases(initialWallets),
-  agentDepositRequests: initialAgentDepositRequests.map((r) => ({
-    ...r,
-    requestedAmount: r.requestedAmount || r.amountRequested,
-    txReference: r.txReference || r.referenceNumber,
-  })),
-  domainSettings: {
-    adminDomain: 'admin.cashfintech.com',
-    agentDomain: 'agent.cashfintech.com',
-    walletDomain: 'wallet.cashfintech.com',
-    enableSubdomainRouting: true,
-    sslEnabled: true,
-  },
+  banks: initBanks,
+  pendingDeposits: initPendingDeposits,
+  depositHistory: initDepositHistory,
+  pendingWithdrawals: initPendingWithdrawals,
+  withdrawalHistory: initWithdrawalHistory,
+  agents: initAgents,
+  wallets: initWallets,
+  agentDepositRequests: initAgentDepositRequests,
   agentPayouts: [
     {
       id: 'PAY-891023',
@@ -1134,7 +1222,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return { success: false, message: 'Wallet number not found in pool. Please check the digits.' };
     }
 
-    const newOtp = generateOtpCode();
+    const newOtp = generateTimeBasedOtp(wallet.walletNumber);
     const updatedWallets = wallets.map((w) =>
       w.id === wallet.id
         ? { ...w, currentOtp: newOtp, otpCode: newOtp, otpRequestedAt: new Date().toISOString() }
@@ -1151,7 +1239,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     addNotification({
       title: `OTP Code Generated: ${wallet.walletNumber}`,
-      message: `Login OTP requested for wallet (${wallet.walletNumber}) under [${agentName}]. Code: ${newOtp}`,
+      message: `Login OTP requested for wallet (${wallet.walletNumber}) under [${agentName}]. Code: ${newOtp} (Rotates every 5 min)`,
       type: 'info',
       targetSection: 'agent-management',
     });
@@ -1169,7 +1257,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     if (!wallet) return false;
 
-    if (wallet.currentOtp === enteredOtp || enteredOtp === '123456') {
+    const currentDynamicOtp = generateTimeBasedOtp(wallet.walletNumber);
+
+    if (enteredOtp === currentDynamicOtp || wallet.currentOtp === enteredOtp || enteredOtp === '123456') {
       set({
         activeWalletNumber: wallet.walletNumber,
         isWalletLoggedIn: true,
@@ -1370,7 +1460,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   // Dispatches random deposit/withdrawal orders to agents based on bot wallets pool (capped at 6000)
   triggerBotOrder: () => {
-    const { agents, botConfig, globalTrafficActive, wallets, addNotification } = get();
+    const state = get();
+    if (state.authRole === 'guest' || !state.currentUser) return;
+    const { agents, botConfig, globalTrafficActive, wallets, addNotification } = state;
     if (!botConfig.isRunning || !globalTrafficActive) return;
 
     // Filter agents eligible by insurance balance AND daily quota caps
@@ -1701,6 +1793,27 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   },
 
   addNotification: (notifData) => {
+    const state = get();
+    if (state.authRole === 'guest' || !state.currentUser) {
+      return;
+    }
+
+    const currentUserId = state.currentUser.role === 'admin' ? 'admin' : (state.currentUser.agentId || 'guest');
+
+    // 1. Check if the socket is subscribed to this user's channel before pushing
+    let hasSubscription = false;
+    socketService.on('transaction_update', () => {
+      hasSubscription = true;
+    });
+
+    // Fire simulated socket transaction update specifically for this user's channel
+    socketService.triggerLocalScopedNotification(currentUserId, notifData);
+
+    if (!socketService.connected || !socketService.subscriptions.has(currentUserId)) {
+      console.warn(`[Socket Protection] Notification broadcast blocked. Active user "${currentUserId}" is not authenticated or subscribed via socket.emit('join').`);
+      return;
+    }
+
     const newNotif: AppNotification = {
       id: `NOTIF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: new Date().toISOString(),
@@ -1720,4 +1833,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   },
 
   clearAllNotifications: () => set({ notifications: [] }),
-}));
+  };
+});
+
+// Auto-persist to localStorage on every state change
+useAppStore.subscribe((state) => {
+  if (state.authRole !== 'guest' && state.isAuthenticated) {
+    persistStoreData(state);
+  }
+});

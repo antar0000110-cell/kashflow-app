@@ -1,6 +1,7 @@
-// KashFlow Push Notification & Device Permission Service
+// UZX Wallet Push Notification & Device Permission Service
 // Handles Desktop Web, Mobile Web (Android/iOS), and Mobile App (PWA/Capacitor)
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 export type DeviceType = 'desktop' | 'mobile_web' | 'mobile_app';
 
@@ -11,7 +12,7 @@ export interface CachedNotificationState {
   promptCount: number;
 }
 
-const CACHE_STORAGE_KEY = 'kashflow_push_notifications_state';
+const CACHE_STORAGE_KEY = 'uzx_push_notifications_state';
 
 // Audio Context Singleton for synthesized high-fidelity chimes
 let audioCtx: AudioContext | null = null;
@@ -36,6 +37,9 @@ function getAudioContext(): AudioContext | null {
  */
 export function playSynthesizedChime(type: 'success' | 'alert' | 'cash' = 'cash'): void {
   try {
+    const role = localStorage.getItem('uzx_auth_role');
+    if (!role || role === 'guest') return;
+
     const ctx = getAudioContext();
     if (!ctx) return;
 
@@ -284,6 +288,33 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
  * Triggers native system dialogue, caches result, and dispatches welcome push if granted.
  */
 export async function requestNotificationPermission(): Promise<'granted' | 'denied' | 'default' | 'unsupported'> {
+  // If inside Capacitor App on Android/iOS, trigger native permission request
+  const isNativeCapacitor = typeof window !== 'undefined' && (window as any).Capacitor !== undefined;
+  if (isNativeCapacitor) {
+    try {
+      const capPermission = await LocalNotifications.requestPermissions();
+      const status = capPermission.display === 'granted' ? 'granted' : capPermission.display === 'denied' ? 'denied' : 'default';
+      setCachedPermissionState(status);
+
+      if (status === 'granted') {
+        playSynthesizedChime('cash');
+        triggerHaptic('success');
+        
+        setTimeout(() => {
+          sendNativePushNotification(
+            '🔔 UZX Wallet Notifications Active',
+            'Instant real-time notifications for orders and commissions are now active.',
+            'success',
+            { tag: 'welcome-notification' }
+          );
+        }, 400);
+      }
+      return status;
+    } catch (e) {
+      console.warn('Native Capacitor local notification permission request failed:', e);
+    }
+  }
+
   if (!isNotificationSupported()) {
     return 'unsupported';
   }
@@ -314,8 +345,8 @@ export async function requestNotificationPermission(): Promise<'granted' | 'deni
       // Dispatch real Native System Push Notification
       setTimeout(() => {
         sendNativePushNotification(
-          '🔔 KashFlow Push Notifications Enabled',
-          'Instant notifications for deposits, withdrawals, and commissions are now active on this device.',
+          '🔔 UZX Wallet Notifications Active',
+          'Instant real-time notifications for orders and commissions are now active.',
           'success',
           { tag: 'welcome-notification' }
         );
@@ -343,9 +374,41 @@ export async function sendNativePushNotification(
     requireInteraction?: boolean;
   }
 ): Promise<boolean> {
+  const role = localStorage.getItem('uzx_auth_role');
+  if (!role || role === 'guest') {
+    return false;
+  }
+
   // Always trigger audio chime and haptic if sound enabled
   playSynthesizedChime(type === 'danger' || type === 'warning' ? 'alert' : 'cash');
   triggerHaptic(type === 'danger' ? 'error' : 'medium');
+
+  // Check Capacitor LocalNotifications first (Native Mobile)
+  const isNativeCapacitor = typeof window !== 'undefined' && (window as any).Capacitor !== undefined;
+  if (isNativeCapacitor) {
+    try {
+      const checkPermission = await LocalNotifications.checkPermissions();
+      if (checkPermission.display === 'granted') {
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              title,
+              body,
+              id: Math.floor(Math.random() * 1000000),
+              schedule: { at: new Date(Date.now() + 100) },
+              sound: 'beep.wav',
+              extra: {
+                url: options?.url,
+              }
+            }
+          ]
+        });
+        return true;
+      }
+    } catch (e) {
+      console.warn('Native Capacitor local notification dispatch failed:', e);
+    }
+  }
 
   if (!isNotificationSupported() || Notification.permission !== 'granted') {
     return false;
@@ -355,7 +418,7 @@ export async function sendNativePushNotification(
     body,
     icon: '/favicon.ico',
     badge: '/favicon.ico',
-    tag: options?.tag || `kashflow-${Date.now()}`,
+    tag: options?.tag || `uzx-${Date.now()}`,
     renotify: true,
     requireInteraction: options?.requireInteraction ?? (type === 'danger' || type === 'warning'),
     data: {

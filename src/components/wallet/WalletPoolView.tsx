@@ -20,7 +20,7 @@ import { Breadcrumb } from '../common/Breadcrumb';
 import { StatusBadge } from '../common/StatusBadge';
 import { PaginationBar } from '../common/PaginationBar';
 import { useAppStore } from '../../store/useAppStore';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, generateTimeBasedOtp } from '../../utils/formatters';
 import { Wallet } from '../../types';
 
 export const WalletPoolView: React.FC = () => {
@@ -401,39 +401,51 @@ export const WalletPoolView: React.FC = () => {
       )}
 
       {/* OTP Display Modal */}
-      {otpModalWallet && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-5 border border-slate-200 text-slate-800 text-center space-y-3">
-            <div className="w-10 h-10 rounded-full bg-rose-50 text-[#8B1E2D] mx-auto flex items-center justify-center">
-              <Key className="w-5 h-5" />
+      {otpModalWallet && (() => {
+        const activeOtp = generateTimeBasedOtp(otpModalWallet.walletNumber || otpModalWallet.phoneNumber || otpModalWallet.accountNumber || '');
+        const timeRemaining = Math.floor((300000 - (Date.now() % 300000)) / 1000);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-5 border border-slate-200 text-slate-800 text-center space-y-3">
+              <div className="w-10 h-10 rounded-full bg-rose-50 text-[#8B1E2D] mx-auto flex items-center justify-center animate-pulse">
+                <Key className="w-5 h-5" />
+              </div>
+
+              <h3 className="font-bold text-sm text-slate-900">
+                Live Authentication OTP
+              </h3>
+              <p className="text-xs text-slate-500 font-mono">
+                Phone: {otpModalWallet.walletNumber || otpModalWallet.phoneNumber || otpModalWallet.accountNumber}
+              </p>
+
+              <div className="py-3 bg-slate-50 rounded-xl border border-[#8B1E2D]/20 shadow-3xs">
+                <span className="font-mono font-black text-3xl tracking-[0.2em] text-[#8B1E2D] pl-[0.2em]">
+                  {activeOtp}
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-500 font-medium">
+                  Rotates automatically every 5 minutes
+                </p>
+                <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                  <div 
+                    className="bg-emerald-500 h-full rounded-full" 
+                    style={{ width: `${(timeRemaining / 300) * 100}%` }} 
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => setOtpModalWallet(null)}
+                className="w-full py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-semibold cursor-pointer transition-colors"
+              >
+                Close
+              </button>
             </div>
-
-            <h3 className="font-bold text-sm text-slate-900">
-              Live Authentication OTP
-            </h3>
-            <p className="text-xs text-slate-500 font-mono">
-              Phone: {otpModalWallet.phoneNumber || otpModalWallet.accountNumber}
-            </p>
-
-            <div className="py-3 bg-slate-100 rounded border border-slate-300">
-              <span className="font-mono font-bold text-2xl tracking-widest text-[#8B1E2D]">
-                {otpModalWallet.lastOtp || '849201'}
-              </span>
-            </div>
-
-            <p className="text-[10px] text-slate-400">
-              Valid for 90 seconds. Cairo Time Verified.
-            </p>
-
-            <button
-              onClick={() => setOtpModalWallet(null)}
-              className="w-full py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-semibold"
-            >
-              Close
-            </button>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Manual Wallet Generation Modal */}
       {isGenModalOpen && (

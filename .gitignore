@@ -6,11 +6,3 @@ coverage/
 *.log
 .env*
 !.env.example
-kashflow-release.keystore
-zux-release.keystore
-android_build.gradle
-app_build.gradle
-settings.gradle
-gen_keystore.sh
-capacitor-cordova-android-plugins_build.gradle
-android/

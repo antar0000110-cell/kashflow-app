@@ -30,6 +30,9 @@ class SoundAlertManager {
   public playTransactionChime() {
     if (!this.soundEnabled) return;
     try {
+      const role = localStorage.getItem('uzx_auth_role');
+      if (!role || role === 'guest') return;
+
       this.initContext();
       if (!this.audioCtx) return;
 
@@ -63,6 +66,9 @@ class SoundAlertManager {
   public playIntervalPulseChime() {
     if (!this.soundEnabled) return;
     try {
+      const role = localStorage.getItem('uzx_auth_role');
+      if (!role || role === 'guest') return;
+
       this.initContext();
       if (!this.audioCtx) return;
 

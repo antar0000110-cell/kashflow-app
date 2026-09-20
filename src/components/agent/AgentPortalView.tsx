@@ -55,6 +55,23 @@ export const AgentPortalView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'inbound_deposits' | 'inbound_withdrawals' | 'history' | 'wallets' | 'payouts'>('inbound_deposits');
 
+  // Synchronize with external triggers (such as mobile bottom navigation)
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail);
+      }
+    };
+    window.addEventListener('change-agent-tab', handler);
+    return () => window.removeEventListener('change-agent-tab', handler);
+  }, []);
+
+  // Notify external listeners of tab changes (e.g. to update active class on bottom nav)
+  React.useEffect(() => {
+    window.dispatchEvent(new CustomEvent('agent-tab-changed', { detail: activeTab }));
+  }, [activeTab]);
+
   // Modals state
   const [isDepositTopupModalOpen, setIsDepositTopupModalOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);

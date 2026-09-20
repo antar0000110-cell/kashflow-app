@@ -42,7 +42,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <AdminSidebar />
 
         {/* Main Workspace Area */}
-        <main className={`flex-1 overflow-y-auto min-w-0 bg-[#F8FAFC] ${activePortal === 'agent' ? 'pb-2' : 'pb-16 md:pb-0'}`}>
+        <main className={`flex-1 overflow-y-auto min-w-0 bg-[#F8FAFC] ${activePortal === 'admin' ? 'pb-16 md:pb-0' : 'pb-20 md:pb-0'}`}>
           {children}
         </main>
       </div>

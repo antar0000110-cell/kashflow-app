@@ -1,5 +1,5 @@
 /**
- * ZUX Financial OS - Production Database & Store Reset Utility
+ * KashFlow Financial OS - Production Database & Store Reset Utility
  *
  * This utility script clears all transaction, agent, wallet, and notification
  * records in the Zustand store and local storage caches to ensure the system

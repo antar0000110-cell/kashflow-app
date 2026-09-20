@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
-import {
-  shouldPromptForNotification,
-  requestNotificationPermission
-} from '../../services/notificationService';
+import { shouldPromptForNotification } from '../../services/notificationService';
+import { useAppStore } from '../../store/useAppStore';
+import { useNotificationGuard } from '../../hooks/useNotificationGuard';
 
 interface NotificationPermissionModalProps {
   forceOpen?: boolean;
@@ -13,9 +12,17 @@ export const NotificationPermissionModal: React.FC<NotificationPermissionModalPr
   forceOpen,
   onClose,
 }) => {
+  const { authRole, currentUser, isAuthenticated } = useAppStore();
+  const { requestPermissionWithGuard } = useNotificationGuard();
+
   useEffect(() => {
+    // If not authenticated (guest, no user, or isAuthenticated is false), strictly do not invoke notification logic
+    if (authRole === 'guest' || !currentUser || !isAuthenticated) {
+      return;
+    }
+
     if (forceOpen) {
-      requestNotificationPermission().finally(() => {
+      requestPermissionWithGuard().finally(() => {
         if (onClose) onClose();
       });
       return;
@@ -31,9 +38,9 @@ export const NotificationPermissionModal: React.FC<NotificationPermissionModalPr
       cleanupListeners();
 
       try {
-        await requestNotificationPermission();
+        await requestPermissionWithGuard();
       } catch (err) {
-        console.error('Failed to request native notification permission:', err);
+        console.error('Failed to request native notification permission with guard:', err);
       }
     };
 
@@ -53,18 +60,14 @@ export const NotificationPermissionModal: React.FC<NotificationPermissionModalPr
 
     addListeners();
 
-    // Also attempt a non-blocking immediate trigger if permitted by user/browser environment
-    const immediateTimer = setTimeout(() => {
-      if (shouldPromptForNotification()) {
-        requestNotificationPermission().catch(() => {});
-      }
-    }, 1500);
-
     return () => {
       cleanupListeners();
-      clearTimeout(immediateTimer);
     };
-  }, [forceOpen, onClose]);
+  }, [forceOpen, onClose, authRole, currentUser, isAuthenticated, requestPermissionWithGuard]);
+
+  if (authRole === 'guest' || !currentUser || !isAuthenticated) {
+    return null;
+  }
 
   return null;
 };
