@@ -7,6 +7,7 @@ echo "============================================================"
 
 # 1. Install dependencies and build web frontend
 echo "[1/7] Installing npm dependencies..."
+rm -f package-lock.json
 npm install --legacy-peer-deps
 
 echo "[2/7] Compiling Vite production web bundle..."
