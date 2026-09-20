@@ -1,4 +1,5 @@
 import { StorageUtil, STORAGE_KEYS } from '../utils/storage';
+import { refreshToken, stopAutoRefresh } from '../utils/tokenRefresh';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -8,15 +9,56 @@ export interface ApiResponse<T = any> {
 }
 
 class ApiService {
-  private getHeaders(): HeadersInit {
+  /**
+   * Central HTTP client with 401 interceptor & automatic single-retry token refresh
+   */
+  private async request(url: string, options: RequestInit = {}, isRetry = false): Promise<Response> {
+    const token = StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      ...((options.headers as Record<string, string>) || {}),
     };
-    const token = StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN);
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    return headers;
+
+    const res = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    // 401 Interceptor: If unauthorized and not already a retry or auth endpoint, attempt ONE token refresh
+    if (
+      res.status === 401 &&
+      !url.includes('/api/auth/login') &&
+      !url.includes('/api/auth/refresh') &&
+      !isRetry
+    ) {
+      console.warn(`[API Client] Received 401 for ${url}. Attempting ONE token refresh...`);
+      const refreshed = await refreshToken();
+      if (refreshed) {
+        // Retry original request exactly once with new token
+        return this.request(url, options, true);
+      } else {
+        console.warn('[API Client] Refresh failed on 401. Forcing logout.');
+        this.forceLogout();
+      }
+    }
+
+    return res;
+  }
+
+  private forceLogout(): void {
+    stopAutoRefresh();
+    StorageUtil.remove(STORAGE_KEYS.AUTH_ROLE);
+    StorageUtil.remove(STORAGE_KEYS.SESSION_TOKEN);
+    StorageUtil.remove(STORAGE_KEYS.USER_PROFILE);
+    StorageUtil.remove(STORAGE_KEYS.SELECTED_AGENT_ID);
+    StorageUtil.remove(STORAGE_KEYS.ACTIVE_PORTAL);
+    StorageUtil.remove(STORAGE_KEYS.ACTIVE_SECTION);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('uzx:auth-failure'));
+    }
   }
 
   public async login(username: string, password: string): Promise<{
@@ -36,16 +78,20 @@ class ApiService {
     } catch (err: any) {
       return {
         success: false,
-        message: 'Network error communicating with authentication server.'
+        message: 'Network error communicating with authentication server.',
       };
     }
   }
 
   public async logout(): Promise<void> {
     try {
+      const token = StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN);
       await fetch('/api/auth/logout', {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
     } catch {
       // ignore network errors on logout
@@ -54,9 +100,8 @@ class ApiService {
 
   public async checkSession(): Promise<{ authenticated: boolean; role?: string; user?: any }> {
     try {
-      const res = await fetch('/api/session-check', {
+      const res = await this.request('/api/session-check', {
         method: 'POST',
-        headers: this.getHeaders(),
       });
       if (!res.ok) {
         return { authenticated: false };
@@ -70,9 +115,8 @@ class ApiService {
 
   public async syncData(): Promise<any> {
     try {
-      const res = await fetch('/api/sync', {
+      const res = await this.request('/api/sync', {
         method: 'GET',
-        headers: this.getHeaders(),
       });
       if (!res.ok) return null;
       const json = await res.json();
@@ -85,9 +129,8 @@ class ApiService {
 
   public async createTransaction(tx: any): Promise<any> {
     try {
-      const res = await fetch('/api/transactions', {
+      const res = await this.request('/api/transactions', {
         method: 'POST',
-        headers: this.getHeaders(),
         body: JSON.stringify(tx),
       });
       const json = await res.json();
@@ -105,9 +148,8 @@ class ApiService {
     rejectionReason?: string
   ): Promise<any> {
     try {
-      const res = await fetch(`/api/transactions/${id}/status`, {
+      const res = await this.request(`/api/transactions/${id}/status`, {
         method: 'PATCH',
-        headers: this.getHeaders(),
         body: JSON.stringify({ status, processedBy, rejectionReason }),
       });
       const json = await res.json();

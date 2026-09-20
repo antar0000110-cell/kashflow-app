@@ -103,6 +103,55 @@ apiRouter.post('/auth/logout', requireAuth, (req: AuthenticatedRequest, res: Res
   });
 });
 
+apiRouter.post('/auth/refresh', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+  const payload = req.user;
+  if (!payload) {
+    res.status(401).json({
+      success: false,
+      message: 'Unauthorized: Valid session token required to refresh.',
+    });
+    return;
+  }
+
+  // Look up user in db to ensure account is active and obtain latest info
+  const user = db.findUserByUsername(payload.username);
+  if (!user) {
+    res.status(401).json({
+      success: false,
+      message: 'User account no longer exists.',
+    });
+    return;
+  }
+
+  if (user.status === 'suspended') {
+    res.status(403).json({
+      success: false,
+      message: 'User account has been suspended.',
+    });
+    return;
+  }
+
+  const newToken = generateAuthToken(user);
+  let agentDetails = null;
+  if (user.role === 'agent' && user.agentId) {
+    agentDetails = db.getAgentById(user.agentId);
+  }
+
+  res.json({
+    success: true,
+    token: newToken,
+    user: {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      name: user.name,
+      agentId: user.agentId,
+      agentName: agentDetails?.name || user.name,
+      email: user.email,
+    },
+  });
+});
+
 // Real Session Check endpoint validating JWT token
 apiRouter.post('/session-check', (req, res: Response) => {
   const authHeader = req.headers.authorization;

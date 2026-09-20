@@ -4,6 +4,7 @@ import { clearAllAppData } from '../../utils/dataStorage';
 import { useAppStore } from '../../store/useAppStore';
 import { StorageUtil, STORAGE_KEYS } from '../../utils/storage';
 import { GlobalLoadingOverlay } from './GlobalLoadingOverlay';
+import { startAutoRefresh, stopAutoRefresh } from '../../utils/tokenRefresh';
 
 export const AppLoader: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -71,6 +72,7 @@ export const AppLoader: React.FC = () => {
     };
 
     const forceHardClearAndRedirect = () => {
+      stopAutoRefresh();
       console.warn(
         '[Session Security] Server rejected token. Performing hard clear of localStorage using clearAllAppData and redirecting to login...'
       );
@@ -95,6 +97,7 @@ export const AppLoader: React.FC = () => {
 
       if (!sessionToken || !authRole || authRole === 'guest') {
         // No session token present: user is a guest, do not wipe localStorage datasets
+        stopAutoRefresh();
         logout();
         setHasValidSession(false);
         setIsAuthenticated(false);
@@ -110,10 +113,12 @@ export const AppLoader: React.FC = () => {
         setHasValidSession(true);
         setIsAuthenticated(true);
         syncWithBackend().catch(() => {});
+        startAutoRefresh();
       } else if (result.rejected) {
         // Server rejected token -> force hard clear of localStorage using clearAllAppData & redirect to login view
         forceHardClearAndRedirect();
       } else {
+        stopAutoRefresh();
         logout();
         setHasValidSession(false);
         setIsAuthenticated(false);
@@ -127,6 +132,14 @@ export const AppLoader: React.FC = () => {
     };
 
     checkSessionAndInitialize();
+
+    const handleAuthFailureEvent = () => {
+      forceHardClearAndRedirect();
+    };
+    window.addEventListener('uzx:auth-failure', handleAuthFailureEvent);
+    return () => {
+      window.removeEventListener('uzx:auth-failure', handleAuthFailureEvent);
+    };
   }, [setIsAuthenticated, logout, storeRole]);
 
   return (

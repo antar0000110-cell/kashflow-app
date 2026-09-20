@@ -28,6 +28,7 @@ import { soundManager } from '../utils/soundAlerts';
 import { sendNativePushNotification } from '../services/notificationService';
 import { socketService } from '../services/socketService';
 import { apiService } from '../services/api';
+import { startAutoRefresh, stopAutoRefresh, setOnRefreshLogout } from '../utils/tokenRefresh';
 
 export type AppSection =
   | 'dashboard'
@@ -425,6 +426,9 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       // Sync latest backend persistent database state
       get().syncWithBackend();
 
+      // Start JWT Token Auto-Refresh cycle for the new token
+      startAutoRefresh();
+
       return { success: true, role };
     } catch (err: any) {
       return {
@@ -435,6 +439,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
   },
 
   logout: () => {
+    stopAutoRefresh();
     apiService.logout().catch(() => {});
     StorageUtil.remove(STORAGE_KEYS.AUTH_ROLE);
     StorageUtil.remove(STORAGE_KEYS.SESSION_TOKEN);
@@ -1901,4 +1906,9 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
 
 // Automatically persist main state arrays and active session parameters to localStorage whenever store state changes
 useAppStore.subscribe(persistStateToStorage);
+
+// Register token refresh failure handler with the store
+setOnRefreshLogout(() => {
+  useAppStore.getState().logout();
+});
 
