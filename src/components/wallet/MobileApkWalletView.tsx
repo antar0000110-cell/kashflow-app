@@ -30,7 +30,7 @@ import {
 } from '../../services/notificationService';
 import { NotificationPermissionModal } from '../notifications/NotificationPermissionModal';
 
-const SAVED_WALLETS_KEY = 'zux_saved_wallets';
+const SAVED_WALLETS_KEY = 'kashflow_saved_wallets';
 
 export const MobileApkWalletView: React.FC = () => {
   const {
@@ -281,14 +281,19 @@ export const MobileApkWalletView: React.FC = () => {
           <div className="flex-1 p-6 flex flex-col justify-between bg-slate-50 overflow-y-auto">
             <div className="space-y-6 pt-4 text-center">
               {/* Brand Logo */}
-              <div className="w-16 h-16 rounded-2xl bg-[#8B1E2D] text-white flex items-center justify-center mx-auto shadow-md">
-                <Smartphone className="w-8 h-8" />
+              <div className="w-20 h-20 rounded-2xl bg-[#0F172A] p-1.5 flex items-center justify-center mx-auto shadow-xl border border-slate-700/60">
+                <img
+                  src="/uzx-logo.png"
+                  alt="UZX Wallet Logo"
+                  className="w-full h-full rounded-xl object-contain"
+                  referrerPolicy="no-referrer"
+                />
               </div>
 
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Sign In to Wallet</h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Certified Fast Electronic Wallet Gateway
+                <h2 className="text-xl font-black tracking-wide text-slate-900">UZX WALLET</h2>
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  Official Egyptian Fast Electronic Wallet Gateway
                 </p>
               </div>
 
@@ -405,7 +410,7 @@ export const MobileApkWalletView: React.FC = () => {
             </div>
 
             <div className="text-center text-[10px] text-slate-400 font-mono py-2">
-              ZUX Secure Mobile Banking Engine v4.2
+              KashFlow Secure Mobile Banking Engine v4.2
             </div>
           </div>
         ) : (
@@ -414,11 +419,17 @@ export const MobileApkWalletView: React.FC = () => {
             {/* Mobile Header Bar */}
             <div className="px-4 py-3 bg-[#8B1E2D] text-white flex items-center justify-between shrink-0 shadow-xs select-none">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center font-bold text-xs border border-white/20">
-                  VF
-                </div>
+                <img
+                  src="/uzx-logo.png"
+                  alt="UZX Logo"
+                  className="w-8 h-8 rounded-lg object-contain shadow-xs border border-white/20 bg-black/20 p-0.5"
+                  referrerPolicy="no-referrer"
+                />
                 <div>
-                  <div className="text-xs font-bold tracking-wide">Vodafone Cash</div>
+                  <div className="text-xs font-bold tracking-wide flex items-center gap-1">
+                    <span>UZX Wallet</span>
+                    <span className="text-[9px] bg-rose-950/80 text-rose-200 px-1 py-0.2 rounded border border-rose-800/80 font-mono">LIVE</span>
+                  </div>
                   <div className="text-[10px] text-rose-200 font-mono flex items-center gap-1">
                     <span>{activeWalletNumber}</span>
                     <button

@@ -104,13 +104,16 @@ export const Header: React.FC = () => {
             }}
             className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none group"
           >
-            {/* Fintech Brand Emblem with Dark Crimson Accent */}
-            <div className="w-8 h-8 rounded-lg bg-[#8B1E2D] flex items-center justify-center font-black text-xs text-white shadow-xs transition-transform group-hover:scale-105 shrink-0 tracking-tighter">
-              ZUX
-            </div>
+            {/* Fintech Brand Emblem with Official UZX Wallet Logo */}
+            <img
+              src="/uzx-logo.png"
+              alt="UZX Wallet Logo"
+              className="w-8 h-8 rounded-lg object-contain shadow-sm transition-transform group-hover:scale-105 shrink-0 bg-white/10 p-0.5"
+              referrerPolicy="no-referrer"
+            />
             <div className="flex flex-col text-left">
               <span className="font-extrabold tracking-widest text-xs sm:text-sm text-white flex items-center gap-1">
-                ZUX <span className="text-rose-400 font-bold">OS</span>
+                UZX <span className="text-rose-400 font-bold">OS</span>
               </span>
               <span className="text-[9px] text-slate-400 font-mono tracking-tight hidden sm:block">
                 EGYPT REAL-TIME FINANCIAL OS

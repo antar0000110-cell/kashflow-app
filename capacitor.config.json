@@ -1,6 +1,6 @@
 {
-  "appId": "com.zux.wallet",
-  "appName": "ZUX Wallet",
+  "appId": "com.uzx.wallet",
+  "appName": "UZX Wallet",
   "webDir": "dist",
   "plugins": {
     "SplashScreen": {

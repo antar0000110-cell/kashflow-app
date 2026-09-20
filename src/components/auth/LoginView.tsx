@@ -39,14 +39,19 @@ export const LoginView: React.FC = () => {
       <div className="w-full max-w-md bg-[#1E293B] border border-[#334155] rounded-2xl shadow-2xl overflow-hidden relative z-10">
         {/* Brand Header */}
         <div className="bg-[#0F172A] p-6 text-center border-b border-[#334155]">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#8B1E2D] text-white shadow-lg mb-3 font-black text-xl tracking-tighter">
-            ZUX
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#0F172A] shadow-xl mb-3 p-1 border border-slate-700/60">
+            <img
+              src="/uzx-logo.png"
+              alt="UZX Wallet Logo"
+              className="w-full h-full rounded-xl object-contain"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <h1 className="text-2xl font-black tracking-widest text-white flex items-center justify-center gap-1.5">
-            ZUX <span className="text-rose-400 font-bold text-lg">SYSTEMS</span>
+            UZX <span className="text-rose-400 font-bold text-lg">WALLET</span>
           </h1>
           <p className="text-[11px] text-slate-400 font-mono tracking-wider uppercase mt-1">
-            FINANCIAL OS & OPERATIONS GATEWAY
+            UZX FINANCIAL OS & OPERATIONS GATEWAY
           </p>
         </div>
 
@@ -122,7 +127,7 @@ export const LoginView: React.FC = () => {
 
       {/* Footer Info */}
       <div className="mt-6 text-center text-[11px] text-slate-500 font-mono">
-        ZUX Financial Systems • Encrypted SSL Connection
+        UZX Wallet Financial Systems • Encrypted SSL Connection
       </div>
     </div>
   );

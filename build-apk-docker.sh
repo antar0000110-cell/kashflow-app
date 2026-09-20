@@ -2,7 +2,7 @@
 set -e
 
 echo "============================================================"
-echo "         ZUX FINANCIAL OS - SIGNED APK BUILD ENGINE        "
+echo "         UZX WALLET - SIGNED APK BUILD ENGINE              "
 echo "============================================================"
 
 # 1. Install dependencies and build web frontend
@@ -23,13 +23,11 @@ npx cap add android
 npx cap sync android
 
 # 4. PATCH: Force kotlin-stdlib-jdk7/jdk8 to 1.8.22 to avoid DuplicateClasses
-#    capacitor-android depends on org.apache.cordova:framework which transitively
-#    pulls kotlin-stdlib-jdk7/jdk8:1.6.21, conflicting with kotlin-stdlib:1.8.22.
 echo "[5/7] Patching Gradle to resolve Kotlin stdlib duplicate classes..."
 
 cat >> android/build.gradle << 'GRADLEOF'
 
-// ZUX Patch: Force kotlin-stdlib-jdk7/jdk8 to match kotlin-stdlib version
+// UZX Patch: Force kotlin-stdlib-jdk7/jdk8 to match kotlin-stdlib version
 subprojects {
     afterEvaluate {
         configurations.all {
@@ -82,14 +80,14 @@ cd ..
 
 # Copy signed APK to output
 SIGNED_APK="android/app/build/outputs/apk/release/app-release.apk"
-OUTPUT_APK="zux-wallet-signed.apk"
+OUTPUT_APK="uzx-wallet-signed.apk"
 
 if [ -f "$SIGNED_APK" ]; then
     cp "$SIGNED_APK" "$OUTPUT_APK"
     echo "============================================================"
     echo " SUCCESS: Signed Production APK Generated Successfully!"
     echo " Output file: $OUTPUT_APK"
-    echo " App ID: com.zux.wallet"
+    echo " App ID: com.uzx.wallet"
     echo " Signed with 2048-bit RSA Keystore (Passes Google Play Protect)"
     echo "============================================================"
     ls -la "$OUTPUT_APK"
