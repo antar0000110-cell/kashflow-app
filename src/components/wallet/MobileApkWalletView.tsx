@@ -29,8 +29,9 @@ import {
   sendNativePushNotification,
 } from '../../services/notificationService';
 import { NotificationPermissionModal } from '../notifications/NotificationPermissionModal';
+import { OfflineStateBanner } from '../common/OfflineStateBanner';
 
-const SAVED_WALLETS_KEY = 'kashflow_saved_wallets';
+const SAVED_WALLETS_KEY = 'uzx_saved_wallets';
 
 export const MobileApkWalletView: React.FC = () => {
   const {
@@ -43,6 +44,7 @@ export const MobileApkWalletView: React.FC = () => {
 
   // Login / Session State
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [walletNumberInput, setWalletNumberInput] = useState('');
   const [savedWallets, setSavedWallets] = useState<string[]>([]);
@@ -410,7 +412,7 @@ export const MobileApkWalletView: React.FC = () => {
             </div>
 
             <div className="text-center text-[10px] text-slate-400 font-mono py-2">
-              KashFlow Secure Mobile Banking Engine v4.2
+              UZX Secure Mobile Banking Engine v4.2
             </div>
           </div>
         ) : (
@@ -466,6 +468,9 @@ export const MobileApkWalletView: React.FC = () => {
               </div>
             </div>
 
+            {/* Offline Banner */}
+            <OfflineStateBanner onStatusChange={setIsOnline} />
+
             {/* Mobile Screen Body - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {/* 1. HOME VIEW */}
@@ -491,10 +496,10 @@ export const MobileApkWalletView: React.FC = () => {
                     </div>
 
                     <div className="pt-2 border-t border-white/20 flex items-center justify-between text-[11px] text-rose-100 font-mono">
-                      <span>Node Status: Active</span>
-                      <span className="text-emerald-300 font-semibold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                        Live Connected
+                      <span>Node Status: {isOnline ? 'Active' : 'Offline'}</span>
+                      <span className={`font-semibold flex items-center gap-1 ${isOnline ? 'text-emerald-300' : 'text-amber-300'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+                        {isOnline ? 'Live Connected' : 'No Connection'}
                       </span>
                     </div>
                   </div>
@@ -677,12 +682,12 @@ export const MobileApkWalletView: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={depositSuccess}
+                      disabled={depositSuccess || !isOnline}
                       className={`w-full py-3 rounded-xl font-bold text-xs text-white shadow-md transition-all cursor-pointer ${
-                        depositSuccess ? 'bg-emerald-600' : 'bg-emerald-700 hover:bg-emerald-800'
+                        !isOnline ? 'bg-slate-400 cursor-not-allowed' : depositSuccess ? 'bg-emerald-600' : 'bg-emerald-700 hover:bg-emerald-800'
                       }`}
                     >
-                      {depositSuccess ? 'Deposit Confirmed &amp; Credited!' : 'Confirm Cash In'}
+                      {!isOnline ? 'Offline - Unavailable' : depositSuccess ? 'Deposit Confirmed &amp; Credited!' : 'Confirm Cash In'}
                     </button>
                   </form>
                 </div>
@@ -738,12 +743,12 @@ export const MobileApkWalletView: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={withdrawSuccess}
+                      disabled={withdrawSuccess || !isOnline}
                       className={`w-full py-3 rounded-xl font-bold text-xs text-white shadow-md transition-all cursor-pointer ${
-                        withdrawSuccess ? 'bg-emerald-600' : 'bg-amber-600 hover:bg-amber-700'
+                        !isOnline ? 'bg-slate-400 cursor-not-allowed' : withdrawSuccess ? 'bg-emerald-600' : 'bg-amber-600 hover:bg-amber-700'
                       }`}
                     >
-                      {withdrawSuccess ? 'Withdrawal Completed!' : 'Confirm Cash Out'}
+                      {!isOnline ? 'Offline - Unavailable' : withdrawSuccess ? 'Withdrawal Completed!' : 'Confirm Cash Out'}
                     </button>
                   </form>
                 </div>
@@ -805,12 +810,12 @@ export const MobileApkWalletView: React.FC = () => {
 
                     <button
                       type="submit"
-                      disabled={transferSuccess}
+                      disabled={transferSuccess || !isOnline}
                       className={`w-full py-3 rounded-xl font-bold text-xs text-white shadow-md transition-all cursor-pointer ${
-                        transferSuccess ? 'bg-emerald-600' : 'bg-[#8B1E2D] hover:bg-[#721825]'
+                        !isOnline ? 'bg-slate-400 cursor-not-allowed' : transferSuccess ? 'bg-emerald-600' : 'bg-[#8B1E2D] hover:bg-[#721825]'
                       }`}
                     >
-                      {transferSuccess ? 'Transfer Completed!' : 'Confirm &amp; Send Money'}
+                      {!isOnline ? 'Offline - Unavailable' : transferSuccess ? 'Transfer Completed!' : 'Confirm &amp; Send Money'}
                     </button>
                   </form>
                 </div>
