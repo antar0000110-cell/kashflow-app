@@ -36,6 +36,6 @@ ENV PORT=3000
 ENV DATA_DIR=/app/data
 
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD node -e "const http=require('http');const req=http.request({hostname:'localhost',port:3000,path:'/health',timeout:3000},res=>{let b='';res.on('data',c=>b+=c);res.on('end',()=>{try{const j=JSON.parse(b);process.exit(j.status==='healthy'?0:1)}catch(e){process.exit(1)}})});req.on('error',()=>process.exit(1));req.end()"
 ENTRYPOINT ["tini", "--"]
 CMD ["node", "dist/server.cjs"]
