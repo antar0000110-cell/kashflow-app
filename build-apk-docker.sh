@@ -24,72 +24,57 @@ npx cap sync android
 
 # 3b. INJECT UZX ICONS into all Android mipmap directories
 echo "[4b/7] Injecting UZX app icons into Android mipmap directories..."
-ICON_SRC="public/icon.png"
 
-if [ -f "$ICON_SRC" ]; then
-    # Remove all default Capacitor icons
-    find android/app/src/main/res -name "ic_launcher*" -delete 2>/dev/null || true
-    find android/app/src/main/res -name "ic_launcher_round*" -delete 2>/dev/null || true
-    find android/app/src/main/res -name "splash*" -delete 2>/dev/null || true
+# Remove all default Capacitor icons
+find android/app/src/main/res -name "ic_launcher*" -delete 2>/dev/null || true
+find android/app/src/main/res -name "ic_launcher_round*" -delete 2>/dev/null || true
 
-    # Copy icons to each density folder
-    for density in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
-        d="${density%%:*}"
-        s="${density##*:}"
-        mkdir -p "android/app/src/main/res/mipmap-${d}"
+# Copy pre-generated icons from public/android-mipmap-*
+for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+    mkdir -p "android/app/src/main/res/mipmap-${density}"
+    if [ -f "public/android-mipmap-${density}/ic_launcher.png" ]; then
+        cp "public/android-mipmap-${density}/ic_launcher.png" "android/app/src/main/res/mipmap-${density}/ic_launcher.png"
+        cp "public/android-mipmap-${density}/ic_launcher_round.png" "android/app/src/main/res/mipmap-${density}/ic_launcher_round.png"
+        echo "  mipmap-${density}: icons copied"
+    fi
+done
 
-        # Use Python PIL to resize (available in the Docker image)
-        python3 -c "
-from PIL import Image
-img = Image.open('${ICON_SRC}')
-img = img.resize((${s}, ${s}), Image.LANCZOS)
-img.save('android/app/src/main/res/mipmap-${d}/ic_launcher.png', 'PNG')
-img_round = img.copy()
-# Create circular mask for round icon
-mask = Image.new('L', (${s}, ${s}), 0)
-from PIL import ImageDraw
-draw = ImageDraw.Draw(mask)
-draw.ellipse((0, 0, ${s}-1, ${s}-1), fill=255)
-img_round.putalpha(mask)
-img_round.save('android/app/src/main/res/mipmap-${d}/ic_launcher_round.png', 'PNG')
-print(f'  mipmap-${d}: ${s}x${s} icons injected')
-"
+# Copy splash screen to drawable directories
+if [ -f "public/splash.png" ]; then
+    for d in drawable drawable-port-mdpi drawable-port-hdpi drawable-port-xhdpi drawable-port-xxhdpi drawable-port-xxxhdpi; do
+        mkdir -p "android/app/src/main/res/${d}"
+        cp "public/splash.png" "android/app/src/main/res/${d}/splash.png"
     done
-
-    # Generate splash screen (1080x1920) with red background and centered logo
-    python3 -c "
-from PIL import Image, ImageDraw
-# Create splash background
-splash = Image.new('RGB', (1080, 1920), '#8B1E2D')
-# Load and resize logo
-logo = Image.open('${ICON_SRC}')
-logo = logo.resize((400, 400), Image.LANCZOS)
-# Center the logo
-x = (1080 - 400) // 2
-y = (1920 - 400) // 2
-splash.paste(logo, (x, y), logo if logo.mode == 'RGBA' else None)
-# Save to all drawable directories
-import os
-for d in ['drawable', 'drawable-port-mdpi', 'drawable-port-hdpi', 'drawable-port-xhdpi', 'drawable-port-xxhdpi', 'drawable-port-xxxhdpi']:
-    path = f'android/app/src/main/res/{d}'
-    os.makedirs(path, exist_ok=True)
-    splash.save(f'{path}/splash.png', 'PNG')
-print('  splash.png generated for all drawable densities')
-"
-
-    # Also generate adaptive icon foreground (square, no padding)
-    python3 -c "
-from PIL import Image
-img = Image.open('${ICON_SRC}')
-img = img.resize((432, 432), Image.LANCZOS)
-img.save('android/app/src/main/res/drawable/ic_launcher_foreground.png', 'PNG')
-print('  Adaptive icon foreground generated (432x432)')
-"
-
-    echo "  All UZX icons injected successfully!"
-else
-    echo "  WARNING: public/icon.png not found, using default Capacitor icons"
+    echo "  splash.png injected to all drawable densities"
 fi
+
+# Copy adaptive icon layers
+if [ -f "public/ic_launcher_foreground.png" ]; then
+    mkdir -p "android/app/src/main/res/drawable"
+    cp "public/ic_launcher_foreground.png" "android/app/src/main/res/drawable/ic_launcher_foreground.png"
+    cp "public/ic_launcher_background.png" "android/app/src/main/res/drawable/ic_launcher_background.png"
+    echo "  Adaptive icon layers injected"
+
+    # Generate adaptive icon XML for mipmap-anydpi-v26
+    mkdir -p "android/app/src/main/res/mipmap-anydpi-v26"
+    cat > android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+XML
+    cat > android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml << 'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+XML
+    echo "  Adaptive icon XML generated"
+fi
+
+echo "  All UZX icons injected successfully!"
 
 # 4. PATCH: Force kotlin-stdlib-jdk7/jdk8 to 1.8.22 to avoid DuplicateClasses
 echo "[5/7] Patching Gradle to resolve Kotlin stdlib duplicate classes..."
