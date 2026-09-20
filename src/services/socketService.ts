@@ -1,6 +1,8 @@
 // UZX Wallet Real-Time Subscription & Socket Simulation Service
 // Restricts broadcasts to individual authenticated instances based on join channels
 
+import { StorageUtil, STORAGE_KEYS } from '../utils/storage';
+
 export interface SocketMock {
   connected: boolean;
   socketId: string;
@@ -18,7 +20,8 @@ class SocketMockService implements SocketMock {
   private listeners: Record<string, Array<(...args: any[]) => void>> = {};
 
   public async connect(userId: string, sessionToken?: string) {
-    const token = sessionToken || localStorage.getItem('uzx_session_token');
+    const token = sessionToken || StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN);
+
     
     // Construct handshake connection options with query token
     const connectionOptions = {

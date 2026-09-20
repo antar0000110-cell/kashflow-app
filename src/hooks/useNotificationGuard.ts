@@ -1,6 +1,7 @@
 import { useAppStore } from '../store/useAppStore';
 import { requestNotificationPermission } from '../services/notificationService';
 import { socketService } from '../services/socketService';
+import { StorageUtil, STORAGE_KEYS } from '../utils/storage';
 
 export function useNotificationGuard() {
   const { authRole, currentUser, isAuthenticated } = useAppStore();
@@ -32,12 +33,13 @@ export function useNotificationGuard() {
 
   const requestPermissionWithGuard = async (): Promise<NotificationPermission | 'unsupported' | 'default'> => {
     // Explicitly block if not authenticated
-    if (!isAuthenticated || !localStorage.getItem('uzx_session_token') || authRole === 'guest' || !currentUser) {
+    if (!isAuthenticated || !StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN) || authRole === 'guest' || !currentUser) {
       console.warn('[Notification Guard] Blocked notification request: User is not authenticated in the store.');
       return 'default';
     }
 
-    const sessionToken = localStorage.getItem('uzx_session_token')!;
+    const sessionToken = StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN)!;
+
     const userId = currentUser.agentId || currentUser.username;
     
     // Strictly verify session token against simulated/mock backend

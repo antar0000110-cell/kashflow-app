@@ -1,11 +1,13 @@
+import { StorageUtil, STORAGE_KEYS } from './storage';
+
 /**
  * SecureLogout Utility
  * Manages secure financial session states, inactivity timeouts,
  * and forces re-authentication when the 5-minute session boundary is reached or when inactive.
  */
 export const SecureLogout = {
-  SESSION_KEY: 'kashflow_wallet_session_expiry',
-  LAST_ACTIVITY_KEY: 'kashflow_wallet_last_activity',
+  SESSION_KEY: STORAGE_KEYS.KASHFLOW_SESSION_EXPIRY,
+  LAST_ACTIVITY_KEY: STORAGE_KEYS.KASHFLOW_LAST_ACTIVITY,
   SESSION_DURATION: 5 * 60 * 1000, // 5 minutes standard maximum session duration
 
   /**
@@ -14,9 +16,9 @@ export const SecureLogout = {
   initSession(): void {
     const expiresAt = Date.now() + this.SESSION_DURATION;
     try {
-      localStorage.setItem(this.SESSION_KEY, expiresAt.toString());
-      localStorage.setItem(this.LAST_ACTIVITY_KEY, Date.now().toString());
-      localStorage.setItem('kashflow_wallet_is_logged_in', 'true');
+      StorageUtil.set(this.SESSION_KEY, expiresAt.toString());
+      StorageUtil.set(this.LAST_ACTIVITY_KEY, Date.now().toString());
+      StorageUtil.set(STORAGE_KEYS.KASHFLOW_LOGGED_IN, 'true');
     } catch (e) {
       console.warn('LocalStorage error during session initialization', e);
     }
@@ -27,9 +29,9 @@ export const SecureLogout = {
    */
   updateActivity(): void {
     try {
-      const isLoggedIn = localStorage.getItem('kashflow_wallet_is_logged_in') === 'true';
+      const isLoggedIn = StorageUtil.get(STORAGE_KEYS.KASHFLOW_LOGGED_IN) === 'true';
       if (isLoggedIn) {
-        localStorage.setItem(this.LAST_ACTIVITY_KEY, Date.now().toString());
+        StorageUtil.set(this.LAST_ACTIVITY_KEY, Date.now().toString());
       }
     } catch (e) {
       console.warn('LocalStorage error during activity update', e);
@@ -41,11 +43,11 @@ export const SecureLogout = {
    */
   checkSessionExpired(): boolean {
     try {
-      const isLoggedIn = localStorage.getItem('kashflow_wallet_is_logged_in') === 'true';
+      const isLoggedIn = StorageUtil.get(STORAGE_KEYS.KASHFLOW_LOGGED_IN) === 'true';
       if (!isLoggedIn) return false;
 
       // 1. Check absolute session expiry (5-minute max lifetime)
-      const expiryStr = localStorage.getItem(this.SESSION_KEY);
+      const expiryStr = StorageUtil.get(this.SESSION_KEY);
       if (!expiryStr) {
         this.initSession();
         return false;
@@ -56,7 +58,7 @@ export const SecureLogout = {
       }
 
       // 2. Check maximum inactivity inactivity timeout (e.g. 3 minutes idle)
-      const lastActivityStr = localStorage.getItem(this.LAST_ACTIVITY_KEY);
+      const lastActivityStr = StorageUtil.get(this.LAST_ACTIVITY_KEY);
       if (lastActivityStr) {
         const lastActivity = parseInt(lastActivityStr, 10);
         const maxIdleTime = 3 * 60 * 1000; // 3 minutes maximum idle duration
@@ -75,12 +77,13 @@ export const SecureLogout = {
    */
   forceLogout(): void {
     try {
-      localStorage.removeItem('kashflow_wallet_is_logged_in');
-      localStorage.removeItem('kashflow_wallet_active_number');
-      localStorage.removeItem(this.SESSION_KEY);
-      localStorage.removeItem(this.LAST_ACTIVITY_KEY);
+      StorageUtil.remove(STORAGE_KEYS.KASHFLOW_LOGGED_IN);
+      StorageUtil.remove(STORAGE_KEYS.KASHFLOW_ACTIVE_NUMBER);
+      StorageUtil.remove(this.SESSION_KEY);
+      StorageUtil.remove(this.LAST_ACTIVITY_KEY);
     } catch (e) {
       console.warn('LocalStorage clear error', e);
     }
   }
 };
+

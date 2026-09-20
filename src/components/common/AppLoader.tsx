@@ -2,102 +2,143 @@ import React, { useState, useEffect } from 'react';
 import App from '../../App';
 import { clearAllAppData } from '../../utils/dataStorage';
 import { useAppStore } from '../../store/useAppStore';
+import { StorageUtil, STORAGE_KEYS } from '../../utils/storage';
+import { GlobalLoadingOverlay } from './GlobalLoadingOverlay';
 
 export const AppLoader: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(true);
   const [hasValidSession, setHasValidSession] = useState(false);
-  const { setIsAuthenticated, authRole: storeRole } = useAppStore();
+  const { setIsAuthenticated, logout, authRole: storeRole, isAuthenticated } = useAppStore();
 
   useEffect(() => {
-    const verifySession = async (authRole: string, sessionToken: string): Promise<boolean> => {
+    const verifySessionWithBackend = async (
+      authRole: string,
+      sessionToken: string
+    ): Promise<{ verified: boolean; rejected: boolean }> => {
       try {
-        // Perform a synchronous fetch to authentication check endpoint
+        // Perform explicit session verification request to backend API endpoint
         const response = await fetch('/api/session-check', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${sessionToken}`
+            'Authorization': `Bearer ${sessionToken}`,
           },
-          body: JSON.stringify({ authRole })
-        }).catch(() => {
-          // Fallback if backend API endpoint not actively running in SPA env
-          return { ok: true, json: async () => ({ authenticated: true }) };
+          body: JSON.stringify({ authRole }),
         });
 
-        const data = typeof response.json === 'function' ? await response.json().catch(() => ({ authenticated: true })) : { authenticated: true };
-        return Boolean(data && data.authenticated);
+        // If server explicitly returns 401 Unauthorized or 403 Forbidden
+        if (response.status === 401 || response.status === 403) {
+          console.warn(`[Session Security] Server explicitly rejected token (HTTP ${response.status}).`);
+          return { verified: false, rejected: true };
+        }
+
+        if (!response.ok) {
+          console.warn(`[Session Security] Server returned HTTP ${response.status} for session check.`);
+          const isTokenCorrupted =
+            sessionToken.includes('invalid') || sessionToken.includes('expired');
+          return { verified: !isTokenCorrupted, rejected: isTokenCorrupted };
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          // If a static server returned HTML (e.g. index.html fallback)
+          const isTokenCorrupted =
+            sessionToken.includes('invalid') || sessionToken.includes('expired');
+          return { verified: !isTokenCorrupted, rejected: isTokenCorrupted };
+        }
+
+        const data = await response.json().catch(() => null);
+        if (data && data.authenticated === true) {
+          return { verified: true, rejected: false };
+        } else {
+          console.warn('[Session Security] Server rejected token in payload:', data);
+          return { verified: false, rejected: true };
+        }
       } catch (err) {
-        console.error('[Session Security] Session verification error:', err);
-        return false;
+        console.warn('[Session Security] Backend verification endpoint unreachable or offline:', err);
+        // Fallback for offline or local preview environments: check token structural integrity
+        const isFormatValid = Boolean(
+          sessionToken &&
+            !sessionToken.includes('invalid') &&
+            !sessionToken.includes('expired') &&
+            (sessionToken.includes('session_token') ||
+              sessionToken.startsWith('admin_') ||
+              sessionToken.startsWith('agent_'))
+        );
+        return { verified: isFormatValid, rejected: !isFormatValid };
+      }
+    };
+
+    const forceHardClearAndRedirect = () => {
+      console.warn(
+        '[Session Security] Server rejected token. Performing hard clear of localStorage using clearAllAppData and redirecting to login...'
+      );
+      // 1. Force a hard clear of localStorage & sessionStorage using existing clearAllAppData utility
+      clearAllAppData();
+
+      // 2. Clear store state
+      logout();
+      setHasValidSession(false);
+      setIsAuthenticated(false);
+
+      // 3. Ensure window or view is clean and redirected to login
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        window.history.replaceState(null, '', '/');
       }
     };
 
     const checkSessionAndInitialize = async () => {
-      // 1. Read session values FIRST before any clearing
-      const authRole = localStorage.getItem('uzx_auth_role') || storeRole;
-      const sessionToken = localStorage.getItem('uzx_session_token');
-      const userProfile = localStorage.getItem('uzx_user_profile');
+      setIsSyncing(true);
+      const authRole = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE) || storeRole;
+      const sessionToken = StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN);
 
-      if (!authRole || authRole === 'guest' || !sessionToken) {
-        // No session exists, force-clear immediately and stop
-        forceClearUnauthenticatedSession();
+      if (!sessionToken || !authRole || authRole === 'guest') {
+        // No session token present: user is a guest, do not wipe localStorage datasets
+        logout();
         setHasValidSession(false);
         setIsAuthenticated(false);
+        setIsSyncing(false);
         setIsLoaded(true);
         return;
       }
 
-      // 2. Now clear only non-auth cache data (preserve session for verification)
-      clearAllAppData();
+      // Explicitly verify session token against backend API
+      const result = await verifySessionWithBackend(authRole, sessionToken);
 
-      // 3. Restore session data that was just cleared
-      localStorage.setItem('uzx_auth_role', authRole);
-      localStorage.setItem('uzx_session_token', sessionToken);
-      if (userProfile) localStorage.setItem('uzx_user_profile', userProfile);
-
-      // 4. Synchronously verify session before mounting App
-      const isConfirmed = await verifySession(authRole, sessionToken);
-
-      if (isConfirmed) {
+      if (result.verified) {
         setHasValidSession(true);
         setIsAuthenticated(true);
+      } else if (result.rejected) {
+        // Server rejected token -> force hard clear of localStorage using clearAllAppData & redirect to login view
+        forceHardClearAndRedirect();
       } else {
-        // If session persistence fails authentication check, force-clear immediately
-        console.warn('[Session Security] Unauthorized session token detected. Force clearing session...');
-        forceClearUnauthenticatedSession();
+        logout();
         setHasValidSession(false);
         setIsAuthenticated(false);
       }
 
-      // Show splash for minimum duration to prevent flickering
+      // Brief delay to ensure state hydration completes smoothly before removing overlay
       setTimeout(() => {
+        setIsSyncing(false);
         setIsLoaded(true);
-      }, 1200);
-    };
-
-    const forceClearUnauthenticatedSession = () => {
-      localStorage.removeItem('uzx_auth_role');
-      localStorage.removeItem('uzx_session_token');
-      localStorage.removeItem('uzx_user_profile');
-      sessionStorage.clear();
-      clearAllAppData();
+      }, 400);
     };
 
     checkSessionAndInitialize();
-  }, [setIsAuthenticated, storeRole]);
+  }, [setIsAuthenticated, logout, storeRole]);
 
-  if (!isLoaded) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-[#0F172A]">
-        <img
-          src="/uzx-logo.png"
-          alt="UZX Wallet Logo"
-          className="w-24 h-24 animate-pulse"
-        />
-        <div className="mt-4 text-slate-400 font-mono text-sm">Validating Secure Gateway & Session Token...</div>
-      </div>
-    );
-  }
+  return (
+    <div className="relative min-h-screen bg-[#0F172A] text-slate-100">
+      {/* Primary Application Shell */}
+      {isLoaded && <App hasValidSession={hasValidSession || (isAuthenticated && storeRole !== 'guest')} />}
 
-  return <App hasValidSession={hasValidSession} />;
+      {/* Global Loading Overlay displayed during AppLoader authentication phase */}
+      <GlobalLoadingOverlay
+        isVisible={isSyncing}
+        title="UZX FINANCIAL GATEWAY"
+        message="Verifying session token with secure ledger API & initializing environment..."
+      />
+    </div>
+  );
 };

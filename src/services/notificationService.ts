@@ -2,6 +2,7 @@
 // Handles Desktop Web, Mobile Web (Android/iOS), and Mobile App (PWA/Capacitor)
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { StorageUtil, STORAGE_KEYS } from '../utils/storage';
 
 export type DeviceType = 'desktop' | 'mobile_web' | 'mobile_app';
 
@@ -12,7 +13,8 @@ export interface CachedNotificationState {
   promptCount: number;
 }
 
-const CACHE_STORAGE_KEY = 'uzx_push_notifications_state';
+const CACHE_STORAGE_KEY = STORAGE_KEYS.PUSH_NOTIFICATIONS_STATE;
+
 
 // Audio Context Singleton for synthesized high-fidelity chimes
 let audioCtx: AudioContext | null = null;
@@ -37,7 +39,7 @@ function getAudioContext(): AudioContext | null {
  */
 export function playSynthesizedChime(type: 'success' | 'alert' | 'cash' = 'cash'): void {
   try {
-    const role = localStorage.getItem('uzx_auth_role');
+    const role = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
     if (!role || role === 'guest') return;
 
     const ctx = getAudioContext();
@@ -194,7 +196,7 @@ export function getNativePermission(): NotificationPermission | 'unsupported' {
 export function getCachedPermissionState(): CachedNotificationState | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(CACHE_STORAGE_KEY);
+    const raw = StorageUtil.get(CACHE_STORAGE_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as CachedNotificationState;
   } catch {
@@ -215,7 +217,7 @@ export function setCachedPermissionState(status: 'granted' | 'denied' | 'default
       deviceType: getDeviceType(),
       promptCount: (currentState?.promptCount || 0) + 1,
     };
-    localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(newState));
+    StorageUtil.set(CACHE_STORAGE_KEY, JSON.stringify(newState));
   } catch (e) {
     console.error('Failed to write to notification cache', e);
   }
@@ -227,7 +229,7 @@ export function setCachedPermissionState(status: 'granted' | 'denied' | 'default
 export function clearNotificationCache(): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(CACHE_STORAGE_KEY);
+    StorageUtil.remove(CACHE_STORAGE_KEY);
   } catch {
     // Ignore
   }
@@ -374,7 +376,7 @@ export async function sendNativePushNotification(
     requireInteraction?: boolean;
   }
 ): Promise<boolean> {
-  const role = localStorage.getItem('uzx_auth_role');
+  const role = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
   if (!role || role === 'guest') {
     return false;
   }

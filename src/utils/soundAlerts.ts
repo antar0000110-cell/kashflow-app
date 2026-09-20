@@ -2,6 +2,8 @@
  * Web Audio API Synthesizer for Real-Time Financial & 90-Second Alerts
  */
 
+import { StorageUtil, STORAGE_KEYS } from './storage';
+
 class SoundAlertManager {
   private audioCtx: AudioContext | null = null;
   private soundEnabled: boolean = true;
@@ -30,8 +32,9 @@ class SoundAlertManager {
   public playTransactionChime() {
     if (!this.soundEnabled) return;
     try {
-      const role = localStorage.getItem('uzx_auth_role');
+      const role = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
       if (!role || role === 'guest') return;
+
 
       this.initContext();
       if (!this.audioCtx) return;
@@ -66,7 +69,7 @@ class SoundAlertManager {
   public playIntervalPulseChime() {
     if (!this.soundEnabled) return;
     try {
-      const role = localStorage.getItem('uzx_auth_role');
+      const role = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
       if (!role || role === 'guest') return;
 
       this.initContext();

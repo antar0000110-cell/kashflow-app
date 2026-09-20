@@ -1,4 +1,5 @@
-import { create } from 'zustand';
+import { create, StateCreator } from 'zustand';
+import { StorageUtil, STORAGE_KEYS } from '../utils/storage';
 import {
   BankAccount,
   Transaction,
@@ -237,91 +238,120 @@ const mapAgentsWithAliases = (rawAgents: Agent[]): Agent[] => {
   }));
 };
 
-const PERSISTENCE_KEY = 'uzx_store_persist';
+const loadPersistedData = <T>(key: string, fallback: T): T => {
+  return StorageUtil.getObject(key, fallback);
+};
 
-interface PersistedStoreData {
-  banks: BankAccount[];
-  pendingDeposits: Transaction[];
-  depositHistory: Transaction[];
-  pendingWithdrawals: Transaction[];
-  withdrawalHistory: Transaction[];
-  agents: Agent[];
-  wallets: Wallet[];
-  agentDepositRequests: AgentDepositRequest[];
-  agentPayouts: AgentPayout[];
-  domainSettings: DomainSettings;
-  commissionRates: { depositCommissionPercent: number; withdrawalCommissionPercent: number };
-  paymentMethods: string[];
-  totalSimulatedWalletsCount: number;
-  globalTrafficActive: boolean;
-  soundEnabled: boolean;
-}
+const savePersistedData = (key: string, data: any) => {
+  StorageUtil.setObject(key, data);
+};
 
-function loadPersistedData(): Partial<PersistedStoreData> | null {
-  try {
-    const raw = localStorage.getItem(PERSISTENCE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.agents && parsed.wallets) {
-      console.log('[UZX Persistence] Loaded store data from localStorage');
-      return parsed;
+const getStoredAuthRole = (): 'guest' | 'admin' | 'agent' => {
+  if (typeof window === 'undefined') return 'guest';
+  const role = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
+  if (role === 'admin' || role === 'agent') return role as any;
+  return 'guest';
+};
+
+const getStoredCurrentUser = () => {
+  if (typeof window === 'undefined') return null;
+  const profile = StorageUtil.get(STORAGE_KEYS.USER_PROFILE);
+  if (profile) {
+    try {
+      return JSON.parse(profile);
+    } catch {
+      return null;
     }
-    return null;
-  } catch {
-    return null;
   }
-}
+  const role = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
+  if (role === 'admin') {
+    return { username: 'Master Admin', role: 'admin' as const };
+  }
+  return null;
+};
 
-function persistStoreData(state: Partial<AppStoreState>): void {
+const getStoredIsAuthenticated = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return !!StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN);
+};
+
+const getStoredSelectedAgentId = (): string => {
+  if (typeof window === 'undefined') return 'AGT-01';
+  return StorageUtil.get(STORAGE_KEYS.SELECTED_AGENT_ID) || 'AGT-01';
+};
+
+const getStoredActivePortal = (): 'admin' | 'agent' | 'wallet-apk' => {
+  if (typeof window === 'undefined') return 'admin';
+  const portal = StorageUtil.get(STORAGE_KEYS.ACTIVE_PORTAL);
+  if (portal === 'admin' || portal === 'agent' || portal === 'wallet-apk') return portal;
+  return getStoredAuthRole() === 'agent' ? 'agent' : 'admin';
+};
+
+const getStoredActiveSection = (): AppSection => {
+  if (typeof window === 'undefined') return 'dashboard';
+  const section = StorageUtil.get(STORAGE_KEYS.ACTIVE_SECTION) as AppSection | null;
+  if (section) return section;
+  return getStoredAuthRole() === 'agent' ? 'agent-portal' : 'dashboard';
+};
+
+const persistStateToStorage = (state: AppStoreState) => {
   try {
-    const data: PersistedStoreData = {
-      banks: state.banks!,
-      pendingDeposits: state.pendingDeposits!,
-      depositHistory: state.depositHistory!,
-      pendingWithdrawals: state.pendingWithdrawals!,
-      withdrawalHistory: state.withdrawalHistory!,
-      agents: state.agents!,
-      wallets: state.wallets!,
-      agentDepositRequests: state.agentDepositRequests!,
-      agentPayouts: state.agentPayouts!,
-      domainSettings: state.domainSettings!,
-      commissionRates: state.commissionRates!,
-      paymentMethods: state.paymentMethods!,
-      totalSimulatedWalletsCount: state.totalSimulatedWalletsCount!,
-      globalTrafficActive: state.globalTrafficActive!,
-      soundEnabled: state.soundEnabled!,
-    };
-    localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.error('[UZX Persistence] Failed to save store data:', e);
+    if (state.isAuthenticated && state.authRole !== 'guest') {
+      StorageUtil.set(STORAGE_KEYS.AUTH_ROLE, state.authRole);
+      if (state.currentUser) {
+        StorageUtil.setObject(STORAGE_KEYS.USER_PROFILE, state.currentUser);
+      }
+      if (state.selectedAgentId) {
+        StorageUtil.set(STORAGE_KEYS.SELECTED_AGENT_ID, state.selectedAgentId);
+      }
+      if (state.activePortal) {
+        StorageUtil.set(STORAGE_KEYS.ACTIVE_PORTAL, state.activePortal);
+      }
+      if (state.activeSection) {
+        StorageUtil.set(STORAGE_KEYS.ACTIVE_SECTION, state.activeSection);
+      }
+    }
+
+    savePersistedData(STORAGE_KEYS.PERSISTED_BANKS, state.banks);
+    savePersistedData(STORAGE_KEYS.PERSISTED_PENDING_DEPOSITS, state.pendingDeposits);
+    savePersistedData(STORAGE_KEYS.PERSISTED_DEPOSIT_HISTORY, state.depositHistory);
+    savePersistedData(STORAGE_KEYS.PERSISTED_PENDING_WITHDRAWALS, state.pendingWithdrawals);
+    savePersistedData(STORAGE_KEYS.PERSISTED_WITHDRAWAL_HISTORY, state.withdrawalHistory);
+    savePersistedData(STORAGE_KEYS.PERSISTED_AGENTS, state.agents);
+    savePersistedData(STORAGE_KEYS.PERSISTED_WALLETS, state.wallets);
+    savePersistedData(STORAGE_KEYS.PERSISTED_AGENT_DEPOSIT_REQUESTS, state.agentDepositRequests);
+    savePersistedData(STORAGE_KEYS.PERSISTED_AGENT_PAYOUTS, state.agentPayouts);
+    savePersistedData(STORAGE_KEYS.PERSISTED_IS_PRODUCTION_MODE, state.isProductionMode);
+    savePersistedData(STORAGE_KEYS.PERSISTED_COMMISSION_RATES, state.commissionRates);
+    savePersistedData(STORAGE_KEYS.PERSISTED_DOMAIN_SETTINGS, state.domainSettings);
+  } catch (err) {
+    console.warn('[Persistence Middleware] Failed to persist state changes:', err);
   }
-}
+};
 
-export const useAppStore = create<AppStoreState>((set, get) => {
-  const persisted = loadPersistedData();
+/**
+ * Zustand Middleware that persists state changes to localStorage.
+ * Ensures agent sessions, newly created agents, and wallet configurations remain active after a browser refresh.
+ */
+const persistMiddleware = (
+  config: StateCreator<AppStoreState>
+): StateCreator<AppStoreState> => (set, get, api) => {
+  const persistentSet: typeof set = (...args: any[]) => {
+    (set as any)(...args);
+    persistStateToStorage(get());
+  };
 
-  const initBanks = persisted?.banks ?? initialBanks;
-  const initPendingDeposits = persisted?.pendingDeposits ?? initialPendingDeposits;
-  const initDepositHistory = persisted?.depositHistory ?? initialHistoricalTransactions.filter((t) => t.type === 'deposit');
-  const initPendingWithdrawals = persisted?.pendingWithdrawals ?? initialPendingWithdrawals;
-  const initWithdrawalHistory = persisted?.withdrawalHistory ?? initialHistoricalTransactions.filter((t) => t.type === 'withdrawal');
-  const initAgents = persisted?.agents ?? mapAgentsWithAliases(initialAgents);
-  const initWallets = persisted?.wallets ?? mapWalletsWithAliases(initialWallets);
-  const initAgentDepositRequests = persisted?.agentDepositRequests ?? initialAgentDepositRequests.map((r) => ({
-    ...r,
-    requestedAmount: r.requestedAmount || r.amountRequested,
-    txReference: r.txReference || r.referenceNumber,
-  }));
+  return config(persistentSet, get, api);
+};
 
-  return {
-
-  authRole: 'guest',
-  currentUser: null,
-  isAuthenticated: false,
+export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) => ({
+  authRole: getStoredAuthRole(),
+  currentUser: getStoredCurrentUser(),
+  isAuthenticated: getStoredIsAuthenticated(),
   setIsAuthenticated: (auth) => set({ isAuthenticated: auth }),
-  activeSection: 'dashboard',
-  activePortal: 'admin',
-  selectedAgentId: 'AGT-01',
+  activeSection: getStoredActiveSection(),
+  activePortal: getStoredActivePortal(),
+  selectedAgentId: getStoredSelectedAgentId(),
   isSidebarOpen: true,
   isSidebarCollapsed: false,
   isMobileDrawerOpen: false,
@@ -333,8 +363,11 @@ export const useAppStore = create<AppStoreState>((set, get) => {
     // 1. Check Master Admin Credentials
     if (cleanUser === 'admin' || cleanUser === 'master' || cleanUser === 'administrator' || (cleanUser === 'admin' && cleanPass === 'admin123')) {
       const userObj = { username: 'Master Admin', role: 'admin' as const };
-      localStorage.setItem('uzx_auth_role', 'admin');
-      localStorage.setItem('uzx_session_token', 'admin_session_token');
+      StorageUtil.set(STORAGE_KEYS.AUTH_ROLE, 'admin');
+      StorageUtil.set(STORAGE_KEYS.SESSION_TOKEN, 'admin_session_token');
+      StorageUtil.setObject(STORAGE_KEYS.USER_PROFILE, userObj);
+      StorageUtil.set(STORAGE_KEYS.ACTIVE_PORTAL, 'admin');
+      StorageUtil.set(STORAGE_KEYS.ACTIVE_SECTION, 'dashboard');
       set({
         authRole: 'admin',
         currentUser: userObj,
@@ -365,8 +398,12 @@ export const useAppStore = create<AppStoreState>((set, get) => {
         agentId: matchedAgent.id,
         agentName: matchedAgent.name,
       };
-      localStorage.setItem('uzx_auth_role', 'agent');
-      localStorage.setItem('uzx_session_token', `agent_session_token_${matchedAgent.id}`);
+      StorageUtil.set(STORAGE_KEYS.AUTH_ROLE, 'agent');
+      StorageUtil.set(STORAGE_KEYS.SESSION_TOKEN, `agent_session_token_${matchedAgent.id}`);
+      StorageUtil.setObject(STORAGE_KEYS.USER_PROFILE, userObj);
+      StorageUtil.set(STORAGE_KEYS.SELECTED_AGENT_ID, matchedAgent.id);
+      StorageUtil.set(STORAGE_KEYS.ACTIVE_PORTAL, 'agent');
+      StorageUtil.set(STORAGE_KEYS.ACTIVE_SECTION, 'agent-portal');
       set({
         authRole: 'agent',
         currentUser: userObj,
@@ -387,8 +424,12 @@ export const useAppStore = create<AppStoreState>((set, get) => {
   },
 
   logout: () => {
-    localStorage.removeItem('uzx_auth_role');
-    localStorage.removeItem('uzx_session_token');
+    StorageUtil.remove(STORAGE_KEYS.AUTH_ROLE);
+    StorageUtil.remove(STORAGE_KEYS.SESSION_TOKEN);
+    StorageUtil.remove(STORAGE_KEYS.USER_PROFILE);
+    StorageUtil.remove(STORAGE_KEYS.SELECTED_AGENT_ID);
+    StorageUtil.remove(STORAGE_KEYS.ACTIVE_PORTAL);
+    StorageUtil.remove(STORAGE_KEYS.ACTIVE_SECTION);
     socketService.disconnect();
     set({
       authRole: 'guest',
@@ -414,15 +455,26 @@ export const useAppStore = create<AppStoreState>((set, get) => {
   supportedCurrencies: ['EGP', 'USD', 'USDT', 'SAR', 'AED'],
   paymentMethods: ['Vodafone Cash', 'InstaPay', 'Orange Cash', 'Etisalat Cash', 'WE Pay', 'Bank Transfer'],
 
-  banks: initBanks,
-  pendingDeposits: initPendingDeposits,
-  depositHistory: initDepositHistory,
-  pendingWithdrawals: initPendingWithdrawals,
-  withdrawalHistory: initWithdrawalHistory,
-  agents: initAgents,
-  wallets: initWallets,
-  agentDepositRequests: initAgentDepositRequests,
-  agentPayouts: [
+  banks: loadPersistedData(STORAGE_KEYS.PERSISTED_BANKS, initialBanks),
+  pendingDeposits: loadPersistedData(STORAGE_KEYS.PERSISTED_PENDING_DEPOSITS, initialPendingDeposits),
+  depositHistory: loadPersistedData(STORAGE_KEYS.PERSISTED_DEPOSIT_HISTORY, initialHistoricalTransactions.filter((t) => t.type === 'deposit')),
+  pendingWithdrawals: loadPersistedData(STORAGE_KEYS.PERSISTED_PENDING_WITHDRAWALS, initialPendingWithdrawals),
+  withdrawalHistory: loadPersistedData(STORAGE_KEYS.PERSISTED_WITHDRAWAL_HISTORY, initialHistoricalTransactions.filter((t) => t.type === 'withdrawal')),
+  agents: loadPersistedData(STORAGE_KEYS.PERSISTED_AGENTS, mapAgentsWithAliases(initialAgents)),
+  wallets: loadPersistedData(STORAGE_KEYS.PERSISTED_WALLETS, mapWalletsWithAliases(initialWallets)),
+  agentDepositRequests: loadPersistedData(STORAGE_KEYS.PERSISTED_AGENT_DEPOSIT_REQUESTS, initialAgentDepositRequests.map((r) => ({
+    ...r,
+    requestedAmount: r.requestedAmount || r.amountRequested,
+    txReference: r.txReference || r.referenceNumber,
+  }))),
+  domainSettings: {
+    adminDomain: 'admin.cashfintech.com',
+    agentDomain: 'agent.cashfintech.com',
+    walletDomain: 'wallet.cashfintech.com',
+    enableSubdomainRouting: true,
+    sslEnabled: true,
+  },
+  agentPayouts: loadPersistedData(STORAGE_KEYS.PERSISTED_AGENT_PAYOUTS, [
     {
       id: 'PAY-891023',
       agentId: 'AGT-01',
@@ -449,7 +501,7 @@ export const useAppStore = create<AppStoreState>((set, get) => {
       processedBy: 'Master Administrator',
       createdAt: '2026-09-17 19:15:00',
     },
-  ],
+  ]),
   totalSimulatedWalletsCount: 6000,
   lastPulseTime: Date.now(),
   notifications: [
@@ -1833,12 +1885,8 @@ export const useAppStore = create<AppStoreState>((set, get) => {
   },
 
   clearAllNotifications: () => set({ notifications: [] }),
-  };
-});
+})));
 
-// Auto-persist to localStorage on every state change
-useAppStore.subscribe((state) => {
-  if (state.authRole !== 'guest' && state.isAuthenticated) {
-    persistStoreData(state);
-  }
-});
+// Automatically persist main state arrays and active session parameters to localStorage whenever store state changes
+useAppStore.subscribe(persistStateToStorage);
+

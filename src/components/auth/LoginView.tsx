@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Layers, Lock, User, ArrowRight, AlertCircle, Fingerprint } from 'lucide-react';
+import { Lock, User, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
+import { StorageUtil, STORAGE_KEYS } from '../../utils/storage';
 
 export const LoginView: React.FC = () => {
   const { login } = useAppStore();
@@ -20,7 +20,7 @@ export const LoginView: React.FC = () => {
     }
 
     setIsLoading(true);
-    localStorage.setItem('uzx_last_username', username.trim());
+    StorageUtil.set(STORAGE_KEYS.LAST_USERNAME, username.trim());
 
     setTimeout(() => {
       const res = login(username.trim(), password.trim());
@@ -29,47 +29,6 @@ export const LoginView: React.FC = () => {
         setError(res.message || 'Invalid login credentials. Please check your username and password.');
       }
     }, 400);
-  };
-
-  const handleBiometricLogin = async () => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      await BiometricAuth.authenticate({
-        reason: 'Authenticate to access your UZX Wallet security vault',
-        allowDeviceCredential: true,
-      });
-      
-      const savedUser = localStorage.getItem('uzx_last_username') || 'admin';
-      const savedPass = savedUser === 'admin' ? 'admin123' : 'agent123';
-      
-      const res = login(savedUser, savedPass);
-      if (res.success) {
-        console.log('[Biometric Login] Authenticated successfully via BiometricAuth');
-      } else {
-        const adminRes = login('admin', 'admin123');
-        if (!adminRes.success) {
-          setError('Biometric authentication succeeded, but could not map to an active user.');
-        }
-      }
-    } catch (err: any) {
-      console.warn('[Biometric Auth] Platform or user canceled:', err);
-      // Fallback/Simulated biometric check for SPA web preview
-      if (err?.message?.includes('not implemented') || typeof window !== 'undefined') {
-        const confirmWeb = window.confirm('🔑 [Web Biometric Simulation]\nWould you like to simulate successful Face ID / Touch ID authentication?');
-        if (confirmWeb) {
-          const res = login('admin', 'admin123');
-          if (res.success) {
-            console.log('[Biometric Simulation] Authenticated successfully on Web');
-            setIsLoading(false);
-            return;
-          }
-        }
-      }
-      setError('Biometric authentication failed or was cancelled.');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -164,16 +123,6 @@ export const LoginView: React.FC = () => {
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleBiometricLogin}
-            disabled={isLoading}
-            className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
-          >
-            <Fingerprint className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>Use Face ID / Touch ID</span>
           </button>
         </form>
       </div>

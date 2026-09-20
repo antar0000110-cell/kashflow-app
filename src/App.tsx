@@ -19,6 +19,8 @@ import { DomainSettingsView } from './components/settings/DomainSettingsView';
 import { NotificationPermissionModal } from './components/notifications/NotificationPermissionModal';
 import { socketService } from './services/socketService';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { StorageUtil, STORAGE_KEYS } from './utils/storage';
+
 import { 
   ArrowDownLeft, 
   ArrowUpRight, 
@@ -37,6 +39,7 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
 
   const {
     authRole,
+    isAuthenticated,
     activePortal,
     activeSection,
     botConfig,
@@ -66,13 +69,15 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
     };
   }, []);
 
+  const isSessionActive = Boolean(hasValidSession || (isAuthenticated && authRole !== 'guest'));
+
   // Connect socket upon valid persistent session mounting
   useEffect(() => {
-    if (hasValidSession && authRole !== 'guest') {
-      const storedRole = localStorage.getItem('uzx_auth_role');
+    if (isSessionActive && authRole !== 'guest') {
+      const storedRole = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
       let userId = 'admin';
       if (storedRole === 'agent') {
-        const storedProfileStr = localStorage.getItem('uzx_user_profile');
+        const storedProfileStr = StorageUtil.get(STORAGE_KEYS.USER_PROFILE);
         try {
           const profile = storedProfileStr ? JSON.parse(storedProfileStr) : null;
           userId = profile?.agentId || 'AGT-01';
@@ -85,11 +90,11 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
     return () => {
       socketService.disconnect();
     };
-  }, [hasValidSession, authRole]);
+  }, [isSessionActive, authRole]);
 
   // Background simulation runner for bot traffic and SLA timeouts - strictly gated behind authenticated session
   useEffect(() => {
-    if (!hasValidSession || authRole === 'guest') return;
+    if (!isSessionActive || authRole === 'guest') return;
 
     // Check SLA / auto-pause rules every 10 seconds
     const expiryInterval = setInterval(() => {
@@ -97,10 +102,10 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
     }, 10000);
 
     return () => clearInterval(expiryInterval);
-  }, [hasValidSession, authRole, runAutoExpiryCheck]);
+  }, [isSessionActive, authRole, runAutoExpiryCheck]);
 
   useEffect(() => {
-    if (!hasValidSession || authRole === 'guest') return;
+    if (!isSessionActive || authRole === 'guest') return;
 
     const isRunning = botConfig.isEnabled || globalTrafficActive;
     if (!isRunning) return;
@@ -110,7 +115,7 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
     }, (botConfig.intervalSeconds || 90) * 1000);
 
     return () => clearInterval(botTimer);
-  }, [hasValidSession, authRole, botConfig.isEnabled, globalTrafficActive, botConfig.intervalSeconds, triggerBotOrder]);
+  }, [isSessionActive, authRole, botConfig.isEnabled, globalTrafficActive, botConfig.intervalSeconds, triggerBotOrder]);
 
   // Unauthenticated Gateway
   if (authRole === 'guest') {

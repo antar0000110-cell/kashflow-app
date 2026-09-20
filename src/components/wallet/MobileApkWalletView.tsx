@@ -24,6 +24,7 @@ import { formatCurrency, generateTimeBasedOtp } from '../../utils/formatters';
 import { WalletSecurityDisplay } from './WalletSecurityDisplay';
 import { OfflineStateBanner } from '../common/OfflineStateBanner';
 import { SecureLogout } from '../../utils/secureLogout';
+import { StorageUtil, STORAGE_KEYS } from '../../utils/storage';
 import { formatCairoTime } from '../../utils/cairoTime';
 import {
   getNativePermission,
@@ -33,7 +34,7 @@ import {
 } from '../../services/notificationService';
 import { NotificationPermissionModal } from '../notifications/NotificationPermissionModal';
 
-const SAVED_WALLETS_KEY = 'kashflow_saved_wallets';
+const SAVED_WALLETS_KEY = STORAGE_KEYS.KASHFLOW_SAVED_WALLETS;
 
 export const MobileApkWalletView: React.FC = () => {
   const {
@@ -48,7 +49,7 @@ export const MobileApkWalletView: React.FC = () => {
   // Login / Session State
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try {
-      return localStorage.getItem('kashflow_wallet_is_logged_in') === 'true';
+      return StorageUtil.get(STORAGE_KEYS.KASHFLOW_LOGGED_IN) === 'true';
     } catch {
       return false;
     }
@@ -62,16 +63,15 @@ export const MobileApkWalletView: React.FC = () => {
   const [loginError, setLoginError] = useState('');
   const [activeWalletNumber, setActiveWalletNumber] = useState(() => {
     try {
-      return localStorage.getItem('kashflow_wallet_active_number') || '01031860138';
+      return StorageUtil.get(STORAGE_KEYS.KASHFLOW_ACTIVE_NUMBER) || '01031860138';
     } catch {
       return '01031860138';
     }
   });
 
-  // Load saved wallet numbers from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(SAVED_WALLETS_KEY);
+      const stored = StorageUtil.get(SAVED_WALLETS_KEY);
       if (stored) {
         const list = JSON.parse(stored);
         if (Array.isArray(list)) {
@@ -84,7 +84,7 @@ export const MobileApkWalletView: React.FC = () => {
         // Default list of initial wallets
         const initial = ['01031860138', '01018073883', '01092530012', '01055419082'];
         setSavedWallets(initial);
-        localStorage.setItem(SAVED_WALLETS_KEY, JSON.stringify(initial));
+        StorageUtil.set(SAVED_WALLETS_KEY, JSON.stringify(initial));
       }
     } catch {
       setSavedWallets(['01031860138', '01018073883']);
@@ -131,7 +131,7 @@ export const MobileApkWalletView: React.FC = () => {
     if (!isLoggedIn) return;
 
     // Initialize session structure if not present
-    const expiry = localStorage.getItem('kashflow_wallet_session_expiry');
+    const expiry = StorageUtil.get(STORAGE_KEYS.KASHFLOW_SESSION_EXPIRY);
     if (!expiry) {
       SecureLogout.initSession();
     }
@@ -201,7 +201,7 @@ export const MobileApkWalletView: React.FC = () => {
     const updatedList = Array.from(new Set([cleanNumber, ...savedWallets])).slice(0, 10);
     setSavedWallets(updatedList);
     try {
-      localStorage.setItem(SAVED_WALLETS_KEY, JSON.stringify(updatedList));
+      StorageUtil.set(SAVED_WALLETS_KEY, JSON.stringify(updatedList));
     } catch {
       // ignore storage errors
     }
@@ -236,8 +236,8 @@ export const MobileApkWalletView: React.FC = () => {
     setOtpInput('');
 
     try {
-      localStorage.setItem('kashflow_wallet_is_logged_in', 'true');
-      localStorage.setItem('kashflow_wallet_active_number', walletNumberInput);
+      StorageUtil.set(STORAGE_KEYS.KASHFLOW_LOGGED_IN, 'true');
+      StorageUtil.set(STORAGE_KEYS.KASHFLOW_ACTIVE_NUMBER, walletNumberInput);
     } catch {
       // ignore
     }
@@ -255,8 +255,8 @@ export const MobileApkWalletView: React.FC = () => {
     setActiveTab('home');
 
     try {
-      localStorage.removeItem('kashflow_wallet_is_logged_in');
-      localStorage.removeItem('kashflow_wallet_active_number');
+      StorageUtil.remove(STORAGE_KEYS.KASHFLOW_LOGGED_IN);
+      StorageUtil.remove(STORAGE_KEYS.KASHFLOW_ACTIVE_NUMBER);
     } catch {
       // ignore
     }

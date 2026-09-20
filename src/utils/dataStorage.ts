@@ -1,13 +1,17 @@
+import { StorageUtil } from './storage';
+
 /**
- * Utility function to wipe all client-side application data
- * (localStorage and sessionStorage) to ensure a clean slate
- * for the production transition.
+ * Utility function to perform a hard clear of all client-side application storage data
+ * (localStorage and sessionStorage) securely.
  */
 export function clearAllAppData(): void {
   try {
-    localStorage.clear();
-    sessionStorage.clear();
-    console.log('[UZX System] LocalStorage and SessionStorage wiped successfully for clean initialization.');
+    StorageUtil.clearSensitiveSession();
+    if (typeof window !== 'undefined') {
+      localStorage.clear();
+      sessionStorage.clear();
+    }
+    console.log('[UZX System] All client-side storage forcibly cleared.');
   } catch (error) {
     console.error('[UZX System] Failed to clear application data:', error);
   }
