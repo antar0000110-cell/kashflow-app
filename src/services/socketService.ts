@@ -1,9 +1,9 @@
-// UZX Wallet Real-Time Subscription & Socket Simulation Service
-// Restricts broadcasts to individual authenticated instances based on join channels
+// UZX Wallet Real-Time WebSocket Service
+// Connects to real backend WebSocket server with room-based pub/sub
 
 import { StorageUtil, STORAGE_KEYS } from '../utils/storage';
 
-export interface SocketMock {
+export interface SocketClient {
   connected: boolean;
   socketId: string;
   subscriptions: Set<string>;
@@ -13,75 +13,92 @@ export interface SocketMock {
   disconnect: () => void;
 }
 
-class SocketMockService implements SocketMock {
+class RealtimeSocketService implements SocketClient {
   public connected: boolean = false;
   public socketId: string = '';
   public subscriptions: Set<string> = new Set();
+  private ws: WebSocket | null = null;
   private listeners: Record<string, Array<(...args: any[]) => void>> = {};
+  private reconnectTimeout: any = null;
+  private currentUserId: string = '';
 
-  public async connect(userId: string, sessionToken?: string) {
+  public connect(userId: string, sessionToken?: string) {
+    this.currentUserId = userId;
     const token = sessionToken || StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN);
 
-    
-    // Construct handshake connection options with query token
-    const connectionOptions = {
-      query: {
-        token: token || ''
-      }
-    };
-    
-    console.log(`[Socket Handshake] Initializing socket connection for user "${userId}"...`);
-    console.log(`[Socket Handshake] Sending connection query handshake token: "${connectionOptions.query.token.substring(0, 15)}..."`);
+    if (typeof window === 'undefined') return;
 
-    // Validate handshake token with backend before establishing connection and room membership
-    const isValid = await this.validateSessionOnBackend(userId, connectionOptions.query.token);
-    if (!isValid) {
-      console.error(`[Socket Security] Handshake authentication rejected. Invalid or missing token in connection query for user "${userId}".`);
-      this.disconnect();
-      return;
+    // Close any previous connection
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch {}
+      this.ws = null;
     }
 
-    this.connected = true;
-    this.socketId = `socket_session_${Math.floor(Math.random() * 1000000)}`;
-    console.log(`[Socket Service] Handshake authenticated successfully. Assigned Socket ID: ${this.socketId}`);
-    
-    // Subscribe strictly to the validated unique room channel
-    this.emit('join', userId);
-  }
-
-  private async validateSessionOnBackend(userId: string, token: string | null): Promise<boolean> {
-    if (!token) return false;
     try {
-      const response = await fetch('/api/verify-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ userId })
-      }).catch(() => {
-        // Fallback for SPA frontend-only environments, validates local storage tokens
-        return {
-          ok: true,
-          json: async () => ({ valid: token.includes('session_token') })
-        };
-      });
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      const wsUrl = `${protocol}//${host}/ws?token=${encodeURIComponent(token || '')}`;
 
-      const data = typeof response.json === 'function' ? await response.json().catch(() => ({ valid: true })) : { valid: true };
-      return Boolean(data && data.valid);
-    } catch {
-      return false;
+      console.log(`[Realtime WebSocket] Connecting to ${wsUrl}...`);
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        this.connected = true;
+        this.socketId = `ws_${Date.now()}`;
+        console.log(`[Realtime WebSocket] Connected successfully. Assigned socket ID: ${this.socketId}`);
+        
+        // Join user room
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ type: 'join', room: userId }));
+          this.subscriptions.add(userId);
+        }
+
+        this.triggerListeners('connect', { socketId: this.socketId });
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type) {
+            this.triggerListeners(payload.type, payload.data || payload);
+          }
+        } catch (err) {
+          console.warn('[Realtime WebSocket] Received non-JSON frame:', event.data);
+        }
+      };
+
+      this.ws.onclose = () => {
+        this.connected = false;
+        console.log('[Realtime WebSocket] Disconnected.');
+        this.triggerListeners('disconnect');
+
+        // Auto reconnect after 3 seconds if user still logged in
+        if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = setTimeout(() => {
+          const activeRole = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
+          if (activeRole && activeRole !== 'guest') {
+            this.connect(this.currentUserId);
+          }
+        }, 3000);
+      };
+
+      this.ws.onerror = (err) => {
+        console.warn('[Realtime WebSocket] Connection error:', err);
+      };
+    } catch (err) {
+      console.error('[Realtime WebSocket] Failed to initialize WebSocket:', err);
     }
   }
 
   public emit(event: string, ...args: any[]) {
-    console.log(`[Socket Emit] Event "${event}":`, args);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: event, payload: args }));
+    }
     if (event === 'join') {
-      const userId = args[0];
-      // Only allow subscription to validated user identifier
-      this.subscriptions.clear(); // Clear previous channels to prevent multiple subscriptions
-      this.subscriptions.add(userId);
-      console.log(`[Socket Subscription] Socket ID ${this.socketId} subscribed to unique room-based channel: "${userId}"`);
+      const room = args[0];
+      this.subscriptions.add(room);
     }
   }
 
@@ -97,38 +114,32 @@ class SocketMockService implements SocketMock {
     this.listeners[event] = this.listeners[event].filter((cb) => cb !== callback);
   }
 
+  private triggerListeners(event: string, ...args: any[]) {
+    const list = this.listeners[event] || [];
+    list.forEach((cb) => {
+      try {
+        cb(...args);
+      } catch (err) {
+        console.error(`[Realtime WebSocket] Error executing listener for "${event}":`, err);
+      }
+    });
+  }
+
   public triggerLocalScopedNotification(targetUserId: string, notificationData: any) {
-    // Only push if socket is connected and targetUserId is explicitly subscribed (scoped to user rather than global broadcast)
-    if (!this.connected) {
-      console.warn(`[Socket Blocked] Blocked notification push. Socket client is not connected.`);
-      return;
-    }
-
-    const isSubscribed = this.subscriptions.has(targetUserId) || this.subscriptions.has('admin');
-    if (!isSubscribed) {
-      console.warn(`[Socket Blocked] Blocked transaction notification. Socket ID ${this.socketId} is not subscribed to user ID "${targetUserId}".`);
-      return;
-    }
-
-    console.log(`[Socket Deliver] Successfully pushed targeted transaction update to Socket ID ${this.socketId} for user "${targetUserId}".`);
-    
-    if (this.listeners['transaction_update']) {
-      this.listeners['transaction_update'].forEach((callback) => {
-        callback(notificationData);
-      });
-    }
+    this.triggerListeners('notification', notificationData);
   }
 
   public disconnect() {
-    if (this.socketId) {
-      console.log(`[Socket Service] Disconnecting Socket ID: ${this.socketId}`);
+    if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch {}
+      this.ws = null;
     }
     this.connected = false;
-    this.socketId = '';
     this.subscriptions.clear();
-    this.listeners = {};
   }
 }
 
-export const socketService = new SocketMockService();
-export default socketService;
+export const socketService = new RealtimeSocketService();

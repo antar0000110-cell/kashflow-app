@@ -9,7 +9,7 @@ export const AppLoader: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
   const [hasValidSession, setHasValidSession] = useState(false);
-  const { setIsAuthenticated, logout, authRole: storeRole, isAuthenticated } = useAppStore();
+  const { setIsAuthenticated, logout, authRole: storeRole, isAuthenticated, syncWithBackend } = useAppStore();
 
   useEffect(() => {
     const verifySessionWithBackend = async (
@@ -109,6 +109,7 @@ export const AppLoader: React.FC = () => {
       if (result.verified) {
         setHasValidSession(true);
         setIsAuthenticated(true);
+        syncWithBackend().catch(() => {});
       } else if (result.rejected) {
         // Server rejected token -> force hard clear of localStorage using clearAllAppData & redirect to login view
         forceHardClearAndRedirect();

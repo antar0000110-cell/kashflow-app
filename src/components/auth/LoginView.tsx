@@ -10,7 +10,7 @@ export const LoginView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -22,13 +22,16 @@ export const LoginView: React.FC = () => {
     setIsLoading(true);
     StorageUtil.set(STORAGE_KEYS.LAST_USERNAME, username.trim());
 
-    setTimeout(() => {
-      const res = login(username.trim(), password.trim());
+    try {
+      const res = await login(username.trim(), password.trim());
       setIsLoading(false);
       if (!res.success) {
         setError(res.message || 'Invalid login credentials. Please check your username and password.');
       }
-    }, 400);
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(err?.message || 'Failed to authenticate. Please check connection and try again.');
+    }
   };
 
   return (

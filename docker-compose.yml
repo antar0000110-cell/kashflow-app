@@ -1,13 +1,23 @@
 version: '3.8'
 
 services:
-  web-management-frontend:
+  uzx-finance-app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: web-management-app
+    container_name: uzx-finance-app
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/app/data
+    volumes:
+      - uzx_db_data:/app/data
+
+volumes:
+  uzx_db_data:
+    driver: local

@@ -46,6 +46,7 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
     globalTrafficActive,
     triggerBotOrder,
     runAutoExpiryCheck,
+    syncWithBackend,
   } = useAppStore();
 
   // Two-way synchronization of mobile active tabs via CustomEvents
@@ -86,11 +87,29 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
         }
       }
       socketService.connect(userId);
+
+      // Handle real-time multi-user synchronization from backend WebSocket
+      const handleRealtimeUpdate = () => {
+        syncWithBackend().catch(() => {});
+      };
+
+      socketService.on('transaction:created', handleRealtimeUpdate);
+      socketService.on('transaction:updated', handleRealtimeUpdate);
+      socketService.on('agent:updated', handleRealtimeUpdate);
+      socketService.on('wallet:updated', handleRealtimeUpdate);
+
+      return () => {
+        socketService.off('transaction:created', handleRealtimeUpdate);
+        socketService.off('transaction:updated', handleRealtimeUpdate);
+        socketService.off('agent:updated', handleRealtimeUpdate);
+        socketService.off('wallet:updated', handleRealtimeUpdate);
+        socketService.disconnect();
+      };
     }
     return () => {
       socketService.disconnect();
     };
-  }, [isSessionActive, authRole]);
+  }, [isSessionActive, authRole, syncWithBackend]);
 
   // Background simulation runner for bot traffic and SLA timeouts - strictly gated behind authenticated session
   useEffect(() => {

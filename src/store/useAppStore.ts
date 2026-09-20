@@ -27,6 +27,7 @@ import { formatCairoTime } from '../utils/cairoTime';
 import { soundManager } from '../utils/soundAlerts';
 import { sendNativePushNotification } from '../services/notificationService';
 import { socketService } from '../services/socketService';
+import { apiService } from '../services/api';
 
 export type AppSection =
   | 'dashboard'
@@ -79,7 +80,8 @@ export interface AppStoreState {
   isMobileDrawerOpen: boolean;
   isProductionMode: boolean;
 
-  login: (username: string, password: string) => { success: boolean; role?: 'admin' | 'agent'; message?: string };
+  syncWithBackend: () => Promise<void>;
+  login: (username: string, password: string) => Promise<{ success: boolean; role?: 'admin' | 'agent'; message?: string }>;
   logout: () => void;
 
   // Selected Order for Modal Inspection
@@ -356,74 +358,84 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
   isSidebarCollapsed: false,
   isMobileDrawerOpen: false,
 
-  login: (username, password) => {
-    const cleanUser = username.trim().toLowerCase();
+  syncWithBackend: async () => {
+    try {
+      const data = await apiService.syncData();
+      if (!data) return;
+      set((state) => ({
+        agents: data.agents && data.agents.length > 0 ? data.agents : state.agents,
+        wallets: data.wallets && data.wallets.length > 0 ? data.wallets : state.wallets,
+        pendingDeposits: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'deposit' && (t.status === 'Pending' || t.status === 'Processing')) : state.pendingDeposits,
+        pendingWithdrawals: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'withdrawal' && (t.status === 'Pending' || t.status === 'Processing')) : state.pendingWithdrawals,
+        depositHistory: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'deposit' && (t.status === 'Approved' || t.status === 'Rejected')) : state.depositHistory,
+        withdrawalHistory: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'withdrawal' && (t.status === 'Approved' || t.status === 'Rejected')) : state.withdrawalHistory,
+        notifications: data.notifications ? data.notifications : state.notifications,
+      }));
+    } catch (err) {
+      console.warn('[Store] syncWithBackend error:', err);
+    }
+  },
+
+  login: async (username, password) => {
+    const cleanUser = username.trim();
     const cleanPass = password.trim();
 
-    // 1. Check Master Admin Credentials
-    if (cleanUser === 'admin' || cleanUser === 'master' || cleanUser === 'administrator' || (cleanUser === 'admin' && cleanPass === 'admin123')) {
-      const userObj = { username: 'Master Admin', role: 'admin' as const };
-      StorageUtil.set(STORAGE_KEYS.AUTH_ROLE, 'admin');
-      StorageUtil.set(STORAGE_KEYS.SESSION_TOKEN, 'admin_session_token');
-      StorageUtil.setObject(STORAGE_KEYS.USER_PROFILE, userObj);
-      StorageUtil.set(STORAGE_KEYS.ACTIVE_PORTAL, 'admin');
-      StorageUtil.set(STORAGE_KEYS.ACTIVE_SECTION, 'dashboard');
-      set({
-        authRole: 'admin',
-        currentUser: userObj,
-        isAuthenticated: true,
-        activePortal: 'admin',
-        activeSection: 'dashboard',
-      });
-      // Subscribe socket to admin channel upon login
-      socketService.connect('admin');
-      return { success: true, role: 'admin' };
-    }
+    try {
+      const res = await apiService.login(cleanUser, cleanPass);
+      if (!res.success || !res.token || !res.user) {
+        return {
+          success: false,
+          message: res.message || 'Invalid username or password. Check credentials and try again.'
+        };
+      }
 
-    // 2. Check Agent Credentials
-    const currentAgents = get().agents;
-    const matchedAgent = currentAgents.find(
-      (a) =>
-        a.username?.toLowerCase() === cleanUser ||
-        a.id.toLowerCase() === cleanUser ||
-        a.phone === cleanUser ||
-        (cleanUser === 'ahmed_ops' && a.id === 'AGT-01') ||
-        (cleanUser === 'agent1' && a.id === 'AGT-01')
-    );
+      const { user, token } = res;
+      const role = user.role as 'admin' | 'agent';
 
-    if (matchedAgent) {
-      const userObj = {
-        username: matchedAgent.username || matchedAgent.name,
-        role: 'agent' as const,
-        agentId: matchedAgent.id,
-        agentName: matchedAgent.name,
+      StorageUtil.set(STORAGE_KEYS.AUTH_ROLE, role);
+      StorageUtil.set(STORAGE_KEYS.SESSION_TOKEN, token);
+      StorageUtil.setObject(STORAGE_KEYS.USER_PROFILE, user);
+
+      if (role === 'admin') {
+        StorageUtil.set(STORAGE_KEYS.ACTIVE_PORTAL, 'admin');
+        StorageUtil.set(STORAGE_KEYS.ACTIVE_SECTION, 'dashboard');
+        set({
+          authRole: 'admin',
+          currentUser: user,
+          isAuthenticated: true,
+          activePortal: 'admin',
+          activeSection: 'dashboard',
+        });
+        socketService.connect('admin', token);
+      } else {
+        StorageUtil.set(STORAGE_KEYS.SELECTED_AGENT_ID, user.agentId || '');
+        StorageUtil.set(STORAGE_KEYS.ACTIVE_PORTAL, 'agent');
+        StorageUtil.set(STORAGE_KEYS.ACTIVE_SECTION, 'agent-portal');
+        set({
+          authRole: 'agent',
+          currentUser: user,
+          isAuthenticated: true,
+          selectedAgentId: user.agentId || '',
+          activePortal: 'agent',
+          activeSection: 'agent-portal',
+        });
+        socketService.connect(user.agentId || user.id, token);
+      }
+
+      // Sync latest backend persistent database state
+      get().syncWithBackend();
+
+      return { success: true, role };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err?.message || 'Authentication failed. Unable to reach server.'
       };
-      StorageUtil.set(STORAGE_KEYS.AUTH_ROLE, 'agent');
-      StorageUtil.set(STORAGE_KEYS.SESSION_TOKEN, `agent_session_token_${matchedAgent.id}`);
-      StorageUtil.setObject(STORAGE_KEYS.USER_PROFILE, userObj);
-      StorageUtil.set(STORAGE_KEYS.SELECTED_AGENT_ID, matchedAgent.id);
-      StorageUtil.set(STORAGE_KEYS.ACTIVE_PORTAL, 'agent');
-      StorageUtil.set(STORAGE_KEYS.ACTIVE_SECTION, 'agent-portal');
-      set({
-        authRole: 'agent',
-        currentUser: userObj,
-        isAuthenticated: true,
-        selectedAgentId: matchedAgent.id,
-        activePortal: 'agent',
-        activeSection: 'agent-portal',
-      });
-      // Subscribe socket to specific agent user ID upon login
-      socketService.connect(matchedAgent.id);
-      return { success: true, role: 'agent' };
     }
-
-    return {
-      success: false,
-      message: 'Invalid username or password. Check credentials and try again.',
-    };
   },
 
   logout: () => {
+    apiService.logout().catch(() => {});
     StorageUtil.remove(STORAGE_KEYS.AUTH_ROLE);
     StorageUtil.remove(STORAGE_KEYS.SESSION_TOKEN);
     StorageUtil.remove(STORAGE_KEYS.USER_PROFILE);
