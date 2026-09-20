@@ -27,20 +27,24 @@ class ApiService {
       headers,
     });
 
-    // 401 Interceptor: If unauthorized and not already a retry or auth endpoint, attempt ONE token refresh
+    // 401 Interceptor: If unauthorized and not an auth endpoint, attempt ONE token refresh retry before forcing logout
     if (
       res.status === 401 &&
       !url.includes('/api/auth/login') &&
-      !url.includes('/api/auth/refresh') &&
-      !isRetry
+      !url.includes('/api/auth/refresh')
     ) {
-      console.warn(`[API Client] Received 401 for ${url}. Attempting ONE token refresh...`);
-      const refreshed = await refreshToken();
-      if (refreshed) {
-        // Retry original request exactly once with new token
-        return this.request(url, options, true);
+      if (!isRetry) {
+        console.warn(`[API Client] Received 401 for ${url}. Attempting ONE token refresh retry...`);
+        const refreshed = await refreshToken();
+        if (refreshed) {
+          // Retry original request exactly once with new token
+          return this.request(url, options, true);
+        } else {
+          console.warn('[API Client] Refresh failed on 401. Forcing logout.');
+          this.forceLogout();
+        }
       } else {
-        console.warn('[API Client] Refresh failed on 401. Forcing logout.');
+        console.warn(`[API Client] Request to ${url} still returned 401 after token refresh retry. Forcing logout.`);
         this.forceLogout();
       }
     }
@@ -156,6 +160,76 @@ class ApiService {
       return json.transaction;
     } catch (err) {
       console.error('[API Client] Update transaction status failed:', err);
+      return null;
+    }
+  }
+
+  public async createAgent(agent: any): Promise<any> {
+    try {
+      const res = await this.request('/api/agents', {
+        method: 'POST',
+        body: JSON.stringify(agent),
+      });
+      const json = await res.json();
+      return json.agent;
+    } catch (err) {
+      console.error('[API Client] Create agent failed:', err);
+      return null;
+    }
+  }
+
+  public async updateAgent(id: string, updates: any): Promise<any> {
+    try {
+      const res = await this.request(`/api/agents/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+      const json = await res.json();
+      return json.agent;
+    } catch (err) {
+      console.error('[API Client] Update agent failed:', err);
+      return null;
+    }
+  }
+
+  public async createWallet(wallet: any): Promise<any> {
+    try {
+      const res = await this.request('/api/wallets', {
+        method: 'POST',
+        body: JSON.stringify(wallet),
+      });
+      const json = await res.json();
+      return json.wallet;
+    } catch (err) {
+      console.error('[API Client] Create wallet failed:', err);
+      return null;
+    }
+  }
+
+  public async updateWallet(id: string, updates: any): Promise<any> {
+    try {
+      const res = await this.request(`/api/wallets/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+      const json = await res.json();
+      return json.wallet;
+    } catch (err) {
+      console.error('[API Client] Update wallet failed:', err);
+      return null;
+    }
+  }
+
+  public async createNotification(notification: any): Promise<any> {
+    try {
+      const res = await this.request('/api/notifications', {
+        method: 'POST',
+        body: JSON.stringify(notification),
+      });
+      const json = await res.json();
+      return json.notification;
+    } catch (err) {
+      console.error('[API Client] Create notification failed:', err);
       return null;
     }
   }

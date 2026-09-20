@@ -273,9 +273,11 @@ export const Header: React.FC = () => {
                         key={notif.id}
                         onClick={() => {
                           markNotificationRead(notif.id);
-                          if (notif.targetSection) {
+                          if (authRole === 'admin' && notif.targetSection) {
                             setActivePortal('admin');
                             setActiveSection(notif.targetSection as any);
+                          } else if (authRole === 'agent') {
+                            setActivePortal('agent');
                           }
                           setIsNotifOpen(false);
                         }}

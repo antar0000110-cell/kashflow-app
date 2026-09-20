@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import { apiRouter } from './server/api';
+import { authRouter } from './server/auth';
 import { realtime } from './server/ws';
 
 async function startServer() {
@@ -21,7 +22,8 @@ async function startServer() {
     next();
   });
 
-  // Mount API routes first
+  // Mount Auth and API routes
+  app.use('/api', authRouter);
   app.use('/api', apiRouter);
 
   // Health check endpoint for Docker / Container Orchestration

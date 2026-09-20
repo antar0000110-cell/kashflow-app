@@ -199,4 +199,7 @@ export interface AppNotification {
   type: 'info' | 'success' | 'warning' | 'danger';
   targetSection?: string;
   isRead: boolean;
+  agentId?: string;
+  targetAgentId?: string;
+  orderId?: string;
 }

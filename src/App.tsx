@@ -86,20 +86,25 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
           userId = 'AGT-01';
         }
       }
-      socketService.connect(userId);
+      socketService.connect(userId, undefined, storedRole || undefined);
+      if (storedRole === 'agent') {
+        socketService.setAuthenticatedAgent(userId, 'agent');
+      }
 
       // Handle real-time multi-user synchronization from backend WebSocket
       const handleRealtimeUpdate = () => {
         syncWithBackend().catch(() => {});
       };
 
-      socketService.on('transaction:created', handleRealtimeUpdate);
+      const unsubCreated = socketService.subscribeToTransactionCreated(handleRealtimeUpdate, {
+        agentId: storedRole === 'agent' ? userId : undefined,
+      });
       socketService.on('transaction:updated', handleRealtimeUpdate);
       socketService.on('agent:updated', handleRealtimeUpdate);
       socketService.on('wallet:updated', handleRealtimeUpdate);
 
       return () => {
-        socketService.off('transaction:created', handleRealtimeUpdate);
+        unsubCreated();
         socketService.off('transaction:updated', handleRealtimeUpdate);
         socketService.off('agent:updated', handleRealtimeUpdate);
         socketService.off('wallet:updated', handleRealtimeUpdate);

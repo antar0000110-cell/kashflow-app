@@ -28,6 +28,7 @@ import { soundManager } from '../utils/soundAlerts';
 import { sendNativePushNotification } from '../services/notificationService';
 import { socketService } from '../services/socketService';
 import { apiService } from '../services/api';
+import { routeAssignmentService } from '../services/RouteAssignmentService';
 import { startAutoRefresh, stopAutoRefresh, setOnRefreshLogout } from '../utils/tokenRefresh';
 
 export type AppSection =
@@ -351,7 +352,12 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
   authRole: getStoredAuthRole(),
   currentUser: getStoredCurrentUser(),
   isAuthenticated: getStoredIsAuthenticated(),
-  setIsAuthenticated: (auth) => set({ isAuthenticated: auth }),
+  setIsAuthenticated: (auth) => {
+    if (!auth) {
+      stopAutoRefresh();
+    }
+    set({ isAuthenticated: auth });
+  },
   activeSection: getStoredActiveSection(),
   activePortal: getStoredActivePortal(),
   selectedAgentId: getStoredSelectedAgentId(),
@@ -363,9 +369,17 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     try {
       const data = await apiService.syncData();
       if (!data) return;
+      const agentsList = data.agents && data.agents.length > 0 ? data.agents : get().agents;
+      const walletsList = data.wallets && data.wallets.length > 0 ? data.wallets : get().wallets;
+
+      // Programmatically link all agents to routing queues with updated metadata
+      agentsList.forEach((agent: Agent) => {
+        routeAssignmentService.linkOnboardedAgent(agent, walletsList);
+      });
+
       set((state) => ({
-        agents: data.agents && data.agents.length > 0 ? data.agents : state.agents,
-        wallets: data.wallets && data.wallets.length > 0 ? data.wallets : state.wallets,
+        agents: agentsList,
+        wallets: walletsList,
         pendingDeposits: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'deposit' && (t.status === 'Pending' || t.status === 'Processing')) : state.pendingDeposits,
         pendingWithdrawals: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'withdrawal' && (t.status === 'Pending' || t.status === 'Processing')) : state.pendingWithdrawals,
         depositHistory: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'deposit' && (t.status === 'Approved' || t.status === 'Rejected')) : state.depositHistory,
@@ -407,7 +421,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           activePortal: 'admin',
           activeSection: 'dashboard',
         });
-        socketService.connect('admin', token);
+        socketService.connect('admin', token, 'admin');
       } else {
         StorageUtil.set(STORAGE_KEYS.SELECTED_AGENT_ID, user.agentId || '');
         StorageUtil.set(STORAGE_KEYS.ACTIVE_PORTAL, 'agent');
@@ -420,7 +434,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           activePortal: 'agent',
           activeSection: 'agent-portal',
         });
-        socketService.connect(user.agentId || user.id, token);
+        socketService.connect(user.agentId || user.id, token, 'agent');
       }
 
       // Sync latest backend persistent database state
@@ -447,6 +461,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     StorageUtil.remove(STORAGE_KEYS.SELECTED_AGENT_ID);
     StorageUtil.remove(STORAGE_KEYS.ACTIVE_PORTAL);
     StorageUtil.remove(STORAGE_KEYS.ACTIVE_SECTION);
+    socketService.setAuthenticatedAgent(null, 'guest');
     socketService.disconnect();
     set({
       authRole: 'guest',
@@ -723,6 +738,10 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       inspectingTransaction: null,
     });
 
+    if (tx.subagentId) {
+      routeAssignmentService.dequeueTransaction(tx.subagentId, tx.id);
+    }
+
     soundManager.playTransactionChime();
 
     addNotification({
@@ -730,6 +749,9 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       message: `Deposit of ${finalAmount} ${tx.currency} (Order ${tx.id}) approved by ${processedBy}.`,
       type: 'success',
       targetSection: 'pending-deposits',
+      targetAgentId: tx.subagentId,
+      agentId: tx.subagentId,
+      orderId: tx.id,
     });
   },
 
@@ -762,11 +784,18 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       inspectingTransaction: null,
     });
 
+    if (tx.subagentId) {
+      routeAssignmentService.dequeueTransaction(tx.subagentId, tx.id);
+    }
+
     addNotification({
       title: 'Deposit Order Rejected',
       message: `Order ${tx.id} for ${tx.amount} ${tx.currency} was rejected by ${processedBy}. Reason: ${reason}`,
       type: 'danger',
       targetSection: 'pending-deposits',
+      targetAgentId: tx.subagentId,
+      agentId: tx.subagentId,
+      orderId: tx.id,
     });
   },
 
@@ -826,6 +855,10 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       inspectingTransaction: null,
     });
 
+    if (tx.subagentId) {
+      routeAssignmentService.dequeueTransaction(tx.subagentId, tx.id);
+    }
+
     soundManager.playTransactionChime();
 
     addNotification({
@@ -833,6 +866,9 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       message: `Withdrawal of ${tx.amount} ${tx.currency} (Order ${tx.id}) dispatched by ${processedBy}.`,
       type: 'success',
       targetSection: 'pending-withdrawals',
+      targetAgentId: tx.subagentId,
+      agentId: tx.subagentId,
+      orderId: tx.id,
     });
   },
 
@@ -865,16 +901,24 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       inspectingTransaction: null,
     });
 
+    if (tx.subagentId) {
+      routeAssignmentService.dequeueTransaction(tx.subagentId, tx.id);
+    }
+
     addNotification({
       title: 'Withdrawal Rejected',
       message: `Withdrawal order ${tx.id} was rejected by ${processedBy}. Reason: ${reason}`,
       type: 'danger',
       targetSection: 'pending-withdrawals',
+      targetAgentId: tx.subagentId,
+      agentId: tx.subagentId,
+      orderId: tx.id,
     });
   },
 
   holdWithdrawal: (transactionId) => {
     const { pendingWithdrawals, addNotification } = get();
+    const tx = pendingWithdrawals.find((t) => t.id === transactionId);
     const updated = pendingWithdrawals.map((t) =>
       t.id === transactionId ? { ...t, status: 'Hold' as TransactionStatus } : t
     );
@@ -884,6 +928,9 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       message: `Order ${transactionId} has been placed on hold for manual fraud verification.`,
       type: 'warning',
       targetSection: 'pending-withdrawals',
+      targetAgentId: tx?.subagentId,
+      agentId: tx?.subagentId,
+      orderId: transactionId,
     });
   },
 
@@ -908,10 +955,15 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       });
     }
 
+    routeAssignmentService.enqueueTransaction(agent.id, transactionId);
+
     addNotification({
       title: 'Order Reassigned',
-      message: `Order ${transactionId} successfully transferred to ${agent.name}.`,
+      message: `Order ${transactionId} successfully transferred to [${agent.name}].`,
       type: 'info',
+      targetAgentId: agent.id,
+      agentId: agent.id,
+      orderId: transactionId,
     });
   },
 
@@ -943,23 +995,83 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
   },
 
   addAgent: (agentData) => {
+    const existingAgents = get().agents;
+    const nextNum = existingAgents.length + 1;
+    const newAgentId = `AGT-${String(nextNum).padStart(2, '0')}`;
+    
+    // Auto-generate starter wallet for the agent
+    const starterPhone = agentData.phone || `010${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const starterWalletId = `WLT-${newAgentId}-01`;
+    const initialDeposit = agentData.insuranceDeposit || 10000;
+
+    const initialWallet: Wallet = {
+      id: starterWalletId,
+      walletNumber: starterPhone,
+      phoneNumber: starterPhone,
+      accountNumber: starterPhone,
+      provider: agentData.depositPaymentMethod || agentData.depositMethod || 'Vodafone Cash',
+      agentId: newAgentId,
+      agentName: agentData.name,
+      assignedAgentId: newAgentId,
+      assignedAgentName: agentData.name,
+      accountHolder: `Primary Wallet (${agentData.name})`,
+      balance: initialDeposit,
+      currency: agentData.currency || 'EGP',
+      status: 'active',
+      isBotWallet: false,
+      createdAt: formatCairoTime(new Date()),
+      currentOtp: generateOtpCode(),
+      otpCode: generateOtpCode(),
+      minSingleLimit: 10,
+      maxSingleLimit: 10000,
+      dailySendLimit: 60000,
+      dailyReceiveLimit: 60000,
+      monthlyLimit: 200000,
+      todaySent: 0,
+      todayReceived: 0,
+      monthTotal: 0,
+    };
+
     const newAgent: Agent = {
-      id: `AGT-0${get().agents.length + 1}`,
+      ...agentData,
+      id: newAgentId,
       todayProcessedCount: 0,
       todayAssignedOrders: 0,
       todayAssignedVolumeEGP: 0,
-      assignedWalletCount: 0,
-      assignedWalletIds: [],
+      assignedWalletCount: 1,
+      assignedWalletIds: [starterWalletId],
       lastActiveAt: new Date().toISOString(),
-      ...agentData,
+      trafficActive: agentData.trafficActive !== undefined ? agentData.trafficActive : get().globalTrafficActive,
+      status: agentData.status || 'active',
     };
-    set((state) => ({ agents: [...state.agents, newAgent] }));
+
+    set((state) => ({
+      agents: [...state.agents, newAgent],
+      wallets: mapWalletsWithAliases([initialWallet, ...state.wallets]),
+    }));
+
+    // Programmatically link newly onboarded agent to dedicated transaction queues
+    routeAssignmentService.linkOnboardedAgent(newAgent, [initialWallet, ...get().wallets]);
+    apiService.createAgent(newAgent).catch(() => {});
+    apiService.createWallet(initialWallet).catch(() => {});
+
+    get().addNotification({
+      title: 'New Agent Added to Order Routing Network',
+      message: `Agent [${newAgent.name}] (${newAgent.id}) onboarded and linked to queue:agent:${newAgent.id}. Traffic routing active.`,
+      type: 'success',
+      targetSection: 'agent-management',
+    });
   },
 
   updateAgent: (id, updates) => {
-    set((state) => ({
-      agents: state.agents.map((a) => (a.id === id ? { ...a, ...updates } : a)),
-    }));
+    set((state) => {
+      const updatedAgents = state.agents.map((a) => (a.id === id ? { ...a, ...updates } : a));
+      const targetAgent = updatedAgents.find((a) => a.id === id);
+      if (targetAgent) {
+        routeAssignmentService.updateAgentMetadata(targetAgent, state.wallets);
+      }
+      return { agents: updatedAgents };
+    });
   },
 
   toggleAgentTraffic: (id) => {
@@ -1527,7 +1639,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     }));
   },
 
-  // Dispatches random deposit/withdrawal orders to agents based on bot wallets pool (capped at 6000)
+    // Dispatches random deposit/withdrawal orders to agents based on bot wallets pool (capped at 6000)
   triggerBotOrder: () => {
     const state = get();
     if (state.authRole === 'guest' || !state.currentUser) return;
@@ -1545,79 +1657,94 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
 
     if (!eligibleAgents.length) return;
 
-    // Pick random eligible agent
-    const agent = eligibleAgents[Math.floor(Math.random() * eligibleAgents.length)];
-
-    // Bot Wallets Logic: Capped at 6,000 bot-reserved wallets
-    const botWallets = wallets.filter((w) => w.isBotWallet === true || w.id.startsWith('WLT-BOT-'));
-    
-    let selectedBotWallet: Wallet;
-    let updatedWalletsList = [...wallets];
-
     const providerList = botConfig.selectedProviders.length ? botConfig.selectedProviders : ['Vodafone Cash', 'InstaPay', 'Orange Cash', 'Etisalat Cash'];
     const provider = providerList[Math.floor(Math.random() * providerList.length)];
 
-    if (botWallets.length < 6000) {
-      // Generate a dedicated bot wallet for this order until cap of 6,000
-      const prefixList = ['010', '011', '012', '015'];
-      const prefix = prefixList[Math.floor(Math.random() * prefixList.length)];
-      const botPhone = `${prefix}${Math.floor(10000000 + Math.random() * 90000000)}`;
-      const botWalletId = `WLT-BOT-${String(botWallets.length + 1).padStart(5, '0')}`;
-
-      selectedBotWallet = {
-        id: botWalletId,
-        walletNumber: botPhone,
-        phoneNumber: botPhone,
-        accountNumber: botPhone,
-        provider,
-        agentId: agent.id,
-        agentName: agent.name,
-        assignedAgentId: agent.id,
-        assignedAgentName: agent.name,
-        accountHolder: `Bot Wallet (${agent.name})`,
-        balance: Math.floor(Math.random() * 8000) + 1000,
-        currency: agent.currency || 'EGP',
-        status: 'active',
-        isBotWallet: true,
-        createdAt: formatCairoTime(new Date()),
-        currentOtp: generateOtpCode(),
-        otpCode: generateOtpCode(),
-        minSingleLimit: 10,
-        maxSingleLimit: 5000,
-        dailySendLimit: 30000,
-        dailyReceiveLimit: 30000,
-        monthlyLimit: 100000,
-        todaySent: 0,
-        todayReceived: 0,
-        monthTotal: 0,
-      };
-
-      updatedWalletsList = [selectedBotWallet, ...wallets];
-    } else {
-      // Reached 6,000 bot wallets cap: reuse from the existing 6,000 bot wallets pool
-      selectedBotWallet = botWallets[Math.floor(Math.random() * botWallets.length)];
-    }
-
-    const clientPhone = selectedBotWallet.walletNumber;
-
-    // Dynamic Deposit vs Withdrawal Ratio with Random Jitter
-    const targetPct = agent.customDepositPercent !== undefined 
-      ? agent.customDepositPercent 
-      : (botConfig.targetDepositPercent || Math.round((botConfig.depositRatio || 0.70) * 100));
-    
-    const jitterPct = agent.customRatioJitter !== undefined 
-      ? agent.customRatioJitter 
-      : (botConfig.ratioJitterPercent !== undefined ? botConfig.ratioJitterPercent : 10);
-
+    // Target deposit calculation
+    const targetPct = botConfig.targetDepositPercent || Math.round((botConfig.depositRatio || 0.70) * 100);
+    const jitterPct = botConfig.ratioJitterPercent !== undefined ? botConfig.ratioJitterPercent : 10;
     const randomJitter = (Math.random() * 2 - 1) * jitterPct;
     const effectivePct = Math.min(95, Math.max(5, targetPct + randomJitter));
     const effectiveProbability = effectivePct / 100;
-
     const isDeposit = Math.random() < effectiveProbability;
+
     const minA = botConfig.minDepositAmount || botConfig.minAmount;
-    const maxA = Math.min(botConfig.maxDepositAmount || botConfig.maxAmount, agent.dailyVolumeMaxEGP - agent.todayAssignedVolumeEGP);
+    const maxA = botConfig.maxDepositAmount || botConfig.maxAmount;
     const safeMax = Math.max(minA, maxA);
     const amount = Math.floor(minA + Math.random() * (safeMax - minA + 1));
+
+    // Employ RouteAssignmentService to pick best agent
+    const routingResult = routeAssignmentService.selectBestAgentForTransaction(
+      isDeposit ? 'deposit' : 'withdrawal',
+      amount,
+      provider,
+      eligibleAgents,
+      wallets
+    );
+
+    const agent = routingResult.agent || eligibleAgents[0];
+
+    // Check or generate assigned wallet
+    let selectedBotWallet: Wallet;
+    let updatedWalletsList = [...wallets];
+
+    if (routingResult.matchedWallet) {
+      selectedBotWallet = routingResult.matchedWallet;
+    } else {
+      // Bot Wallets Logic: Capped at 6,000 bot-reserved wallets
+      const botWallets = wallets.filter((w) => w.isBotWallet === true || w.id.startsWith('WLT-BOT-'));
+      
+      if (botWallets.length < 6000) {
+        // Generate a dedicated bot wallet for this order until cap of 6,000
+        const prefixList = ['010', '011', '012', '015'];
+        const prefix = prefixList[Math.floor(Math.random() * prefixList.length)];
+        const botPhone = `${prefix}${Math.floor(10000000 + Math.random() * 90000000)}`;
+        const botWalletId = `WLT-BOT-${String(botWallets.length + 1).padStart(5, '0')}`;
+
+        selectedBotWallet = {
+          id: botWalletId,
+          walletNumber: botPhone,
+          phoneNumber: botPhone,
+          accountNumber: botPhone,
+          provider,
+          agentId: agent.id,
+          agentName: agent.name,
+          assignedAgentId: agent.id,
+          assignedAgentName: agent.name,
+          accountHolder: `Bot Wallet (${agent.name})`,
+          balance: Math.floor(Math.random() * 8000) + 1000,
+          currency: agent.currency || 'EGP',
+          status: 'active',
+          isBotWallet: true,
+          createdAt: formatCairoTime(new Date()),
+          currentOtp: generateOtpCode(),
+          otpCode: generateOtpCode(),
+          minSingleLimit: 10,
+          maxSingleLimit: 5000,
+          dailySendLimit: 30000,
+          dailyReceiveLimit: 30000,
+          monthlyLimit: 100000,
+          todaySent: 0,
+          todayReceived: 0,
+          monthTotal: 0,
+        };
+
+        updatedWalletsList = [selectedBotWallet, ...wallets];
+        apiService.createWallet(selectedBotWallet).catch(() => {});
+      } else {
+        // Reached 6,000 bot wallets cap: reuse from the existing 6,000 bot wallets pool
+        const existingWallet = botWallets[Math.floor(Math.random() * botWallets.length)];
+        selectedBotWallet = {
+          ...existingWallet,
+          agentId: agent.id,
+          agentName: agent.name,
+          assignedAgentId: agent.id,
+          assignedAgentName: agent.name,
+        };
+      }
+    }
+
+    const clientPhone = selectedBotWallet.walletNumber;
 
     const bank = botConfig.selectedBanks[Math.floor(Math.random() * botConfig.selectedBanks.length)] || `${provider} Gateway`;
     const hash = generateHash(24);
@@ -1662,6 +1789,9 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           : a
       );
 
+      // Enqueue to agent's dedicated route queue
+      routeAssignmentService.enqueueTransaction(agent.id, newDeposit.id);
+
       set((state) => ({
         wallets: mapWalletsWithAliases(updatedWalletsList),
         pendingDeposits: [newDeposit, ...state.pendingDeposits],
@@ -1673,6 +1803,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         },
       }));
 
+      apiService.createTransaction(newDeposit).catch(() => {});
       soundManager.playTransactionChime();
 
       addNotification({
@@ -1680,6 +1811,9 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         message: `Inbound ${provider} deposit assigned to [${agent.name}]. Wallet: ${selectedBotWallet.walletNumber}`,
         type: 'info',
         targetSection: 'pending-deposits',
+        targetAgentId: agent.id,
+        agentId: agent.id,
+        orderId: newDeposit.id,
       });
     } else {
       const newWithdrawal: Transaction = {
@@ -1717,6 +1851,9 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           : a
       );
 
+      // Enqueue to agent's dedicated route queue
+      routeAssignmentService.enqueueTransaction(agent.id, newWithdrawal.id);
+
       set((state) => ({
         wallets: mapWalletsWithAliases(updatedWalletsList),
         pendingWithdrawals: [newWithdrawal, ...state.pendingWithdrawals],
@@ -1728,13 +1865,17 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         },
       }));
 
+      apiService.createTransaction(newWithdrawal).catch(() => {});
       soundManager.playTransactionChime();
 
       addNotification({
-        title: `New Withdrawal Order: ${amount} ${agent.currency || 'EGP'}`,
+        title: `Pending Withdrawal Order: ${amount} ${agent.currency || 'EGP'}`,
         message: `Pending withdrawal dispatched to [${agent.name}]. Wallet: ${selectedBotWallet.walletNumber}`,
         type: 'warning',
         targetSection: 'pending-withdrawals',
+        targetAgentId: agent.id,
+        agentId: agent.id,
+        orderId: newWithdrawal.id,
       });
     }
   },
@@ -1779,6 +1920,8 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       message: `Commission payout of ${amount.toLocaleString()} ${agent.currency || 'EGP'} transferred to agent account (${agent.name}). Ref: ${referenceNumber}`,
       type: 'success',
       targetSection: 'financial-reports',
+      targetAgentId: agent.id,
+      agentId: agent.id,
     });
   },
 
@@ -1868,20 +2011,16 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     }
 
     const currentUserId = state.currentUser.role === 'admin' ? 'admin' : (state.currentUser.agentId || 'guest');
+    const isAgent = state.currentUser.role === 'agent';
+    const targetAgent = notifData.targetAgentId || notifData.agentId;
 
-    // 1. Check if the socket is subscribed to this user's channel before pushing
-    let hasSubscription = false;
-    socketService.on('transaction_update', () => {
-      hasSubscription = true;
-    });
-
-    // Fire simulated socket transaction update specifically for this user's channel
-    socketService.triggerLocalScopedNotification(currentUserId, notifData);
-
-    if (!socketService.connected || !socketService.subscriptions.has(currentUserId)) {
-      console.warn(`[Socket Protection] Notification broadcast blocked. Active user "${currentUserId}" is not authenticated or subscribed via socket.emit('join').`);
+    // Filter out notifications not belonging to the currently logged in agent
+    if (isAgent && targetAgent && targetAgent !== state.currentUser.agentId) {
       return;
     }
+
+    // Fire socket transaction update specifically for this user's channel
+    socketService.triggerLocalScopedNotification(currentUserId, notifData);
 
     const newNotif: AppNotification = {
       id: `NOTIF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -1889,7 +2028,11 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       isRead: false,
       ...notifData,
     };
+
     set((state) => ({ notifications: [newNotif, ...state.notifications].slice(0, 50) }));
+
+    // Sync notification to backend API for persistence and cross-session delivery
+    apiService.createNotification(newNotif).catch(() => {});
 
     // Send native system push notification to Desktop / Mobile / PWA
     sendNativePushNotification(notifData.title, notifData.message, notifData.type).catch(() => {});

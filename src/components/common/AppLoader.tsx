@@ -4,13 +4,20 @@ import { clearAllAppData } from '../../utils/dataStorage';
 import { useAppStore } from '../../store/useAppStore';
 import { StorageUtil, STORAGE_KEYS } from '../../utils/storage';
 import { GlobalLoadingOverlay } from './GlobalLoadingOverlay';
-import { startAutoRefresh, stopAutoRefresh } from '../../utils/tokenRefresh';
+import { startAutoRefresh, stopAutoRefresh, decodeJWT } from '../../utils/tokenRefresh';
 
 export const AppLoader: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
   const [hasValidSession, setHasValidSession] = useState(false);
   const { setIsAuthenticated, logout, authRole: storeRole, isAuthenticated, syncWithBackend } = useAppStore();
+
+  // Ensure stopAutoRefresh is called whenever user is not authenticated (e.g. on logout)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      stopAutoRefresh();
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const verifySessionWithBackend = async (
@@ -106,6 +113,18 @@ export const AppLoader: React.FC = () => {
         return;
       }
 
+      // Gate: Check JWT expiry claim upfront before network calls
+      const decoded = decodeJWT(sessionToken);
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      if (decoded?.exp && decoded.exp <= nowSeconds) {
+        console.warn('[Session Security] Session token has expired per JWT exp claim. Forcing logout.');
+        stopAutoRefresh();
+        forceHardClearAndRedirect();
+        setIsSyncing(false);
+        setIsLoaded(true);
+        return;
+      }
+
       // Explicitly verify session token against backend API
       const result = await verifySessionWithBackend(authRole, sessionToken);
 
@@ -113,9 +132,23 @@ export const AppLoader: React.FC = () => {
         setHasValidSession(true);
         setIsAuthenticated(true);
         syncWithBackend().catch(() => {});
-        startAutoRefresh();
+
+        // Gated by checking the JWT expiry claim first before starting auto-refresh
+        const currentToken = StorageUtil.get(STORAGE_KEYS.SESSION_TOKEN) || sessionToken;
+        const currentDecoded = decodeJWT(currentToken);
+        const currentNowSeconds = Math.floor(Date.now() / 1000);
+
+        if (currentDecoded?.exp && currentDecoded.exp <= currentNowSeconds) {
+          console.warn('[Session Security] Token expired per exp claim. Stopping auto-refresh.');
+          stopAutoRefresh();
+          forceHardClearAndRedirect();
+        } else {
+          console.log('[Session Security] Token validated and unexpired. Initiating startAutoRefresh().');
+          startAutoRefresh();
+        }
       } else if (result.rejected) {
         // Server rejected token -> force hard clear of localStorage using clearAllAppData & redirect to login view
+        stopAutoRefresh();
         forceHardClearAndRedirect();
       } else {
         stopAutoRefresh();
@@ -134,10 +167,12 @@ export const AppLoader: React.FC = () => {
     checkSessionAndInitialize();
 
     const handleAuthFailureEvent = () => {
+      stopAutoRefresh();
       forceHardClearAndRedirect();
     };
     window.addEventListener('uzx:auth-failure', handleAuthFailureEvent);
     return () => {
+      stopAutoRefresh();
       window.removeEventListener('uzx:auth-failure', handleAuthFailureEvent);
     };
   }, [setIsAuthenticated, logout, storeRole]);

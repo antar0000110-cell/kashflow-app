@@ -321,7 +321,12 @@ class DatabaseEngine {
   }
 
   // Notifications
-  public getNotifications(userId?: string): any[] {
+  public getNotifications(userRole?: string, agentId?: string): any[] {
+    if (userRole === 'agent' && agentId) {
+      return this.data.notifications.filter(
+        (n) => !n.agentId && !n.targetAgentId || n.agentId === agentId || n.targetAgentId === agentId
+      );
+    }
     return [...this.data.notifications];
   }
 
@@ -361,10 +366,12 @@ class DatabaseEngine {
     const isAgent = userRole === 'agent';
     return {
       agents: isAgent ? this.data.agents.filter((a) => a.id === agentId) : this.data.agents,
-      wallets: isAgent ? this.data.wallets.filter((w) => w.agentId === agentId) : this.data.wallets,
+      wallets: isAgent ? this.data.wallets.filter((w) => w.agentId === agentId || w.assignedAgentId === agentId) : this.data.wallets,
       transactions: isAgent ? this.data.transactions.filter((t) => t.subagentId === agentId) : this.data.transactions,
       banks: this.data.banks,
-      notifications: this.data.notifications,
+      notifications: isAgent
+        ? this.data.notifications.filter((n) => !n.agentId && !n.targetAgentId || n.agentId === agentId || n.targetAgentId === agentId)
+        : this.data.notifications,
       botConfig: this.data.botConfig,
       serverTime: new Date().toISOString()
     };

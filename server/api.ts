@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { db } from './db';
 import {
   generateAuthToken,
@@ -6,6 +7,7 @@ import {
   verifyUserPassword,
   requireAuth,
   requireAdmin,
+  handleRefreshToken,
   AuthenticatedRequest
 } from './auth';
 import { realtime } from './ws';
@@ -103,54 +105,7 @@ apiRouter.post('/auth/logout', requireAuth, (req: AuthenticatedRequest, res: Res
   });
 });
 
-apiRouter.post('/auth/refresh', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
-  const payload = req.user;
-  if (!payload) {
-    res.status(401).json({
-      success: false,
-      message: 'Unauthorized: Valid session token required to refresh.',
-    });
-    return;
-  }
-
-  // Look up user in db to ensure account is active and obtain latest info
-  const user = db.findUserByUsername(payload.username);
-  if (!user) {
-    res.status(401).json({
-      success: false,
-      message: 'User account no longer exists.',
-    });
-    return;
-  }
-
-  if (user.status === 'suspended') {
-    res.status(403).json({
-      success: false,
-      message: 'User account has been suspended.',
-    });
-    return;
-  }
-
-  const newToken = generateAuthToken(user);
-  let agentDetails = null;
-  if (user.role === 'agent' && user.agentId) {
-    agentDetails = db.getAgentById(user.agentId);
-  }
-
-  res.json({
-    success: true,
-    token: newToken,
-    user: {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      name: user.name,
-      agentId: user.agentId,
-      agentName: agentDetails?.name || user.name,
-      email: user.email,
-    },
-  });
-});
+apiRouter.post('/auth/refresh', handleRefreshToken);
 
 // Real Session Check endpoint validating JWT token
 apiRouter.post('/session-check', (req, res: Response) => {
@@ -324,6 +279,32 @@ apiRouter.get('/agents', requireAuth, (req: AuthenticatedRequest, res: Response)
   res.json({ success: true, agents: db.getAgents() });
 });
 
+apiRouter.post('/agents', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+  const agentData = req.body;
+  const newAgent = db.createAgent(agentData);
+
+  // Register login account for the agent so they can authenticate immediately
+  if (newAgent.username) {
+    const existing = db.findUserByUsername(newAgent.username);
+    if (!existing) {
+      db.createUser({
+        username: newAgent.username,
+        passwordHash: bcrypt.hashSync(agentData.password || 'Agent@123', 10),
+        role: 'agent',
+        agentId: newAgent.id,
+        name: newAgent.name,
+        phone: newAgent.phone,
+        email: newAgent.email,
+        status: newAgent.status || 'active'
+      });
+    }
+  }
+
+  realtime.broadcast('agent:created', newAgent);
+  realtime.broadcast('agent:updated', newAgent);
+  res.json({ success: true, agent: newAgent });
+});
+
 apiRouter.patch('/agents/:id', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
   const { id } = req.params;
   const updates = req.body;
@@ -340,10 +321,18 @@ apiRouter.get('/wallets', requireAuth, (req: AuthenticatedRequest, res: Response
   const user = req.user!;
   const allWallets = db.getWallets();
   if (user.role === 'agent') {
-    res.json({ success: true, wallets: allWallets.filter((w) => w.agentId === user.agentId) });
+    res.json({ success: true, wallets: allWallets.filter((w) => w.agentId === user.agentId || w.assignedAgentId === user.agentId) });
     return;
   }
   res.json({ success: true, wallets: allWallets });
+});
+
+apiRouter.post('/wallets', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+  const walletData = req.body;
+  const newWallet = db.createWallet(walletData);
+  realtime.broadcast('wallet:created', newWallet);
+  realtime.broadcast('wallet:updated', newWallet);
+  res.json({ success: true, wallet: newWallet });
 });
 
 apiRouter.patch('/wallets/:id', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
@@ -363,11 +352,18 @@ apiRouter.patch('/wallets/:id', requireAuth, requireAdmin, (req: AuthenticatedRe
 // ----------------------------------------------------
 
 apiRouter.get('/notifications', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  res.json({ success: true, notifications: db.getNotifications() });
+  const user = req.user!;
+  res.json({ success: true, notifications: db.getNotifications(user.role, user.agentId) });
 });
 
 apiRouter.post('/notifications', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const notif = db.addNotification(req.body);
-  realtime.broadcast('notification:created', notif);
+  if (notif.agentId || notif.targetAgentId) {
+    const target = notif.agentId || notif.targetAgentId;
+    realtime.broadcast('notification:created', notif, `agent:${target}`);
+    realtime.broadcast('notification:created', notif, 'admin');
+  } else {
+    realtime.broadcast('notification:created', notif);
+  }
   res.json({ success: true, notification: notif });
 });

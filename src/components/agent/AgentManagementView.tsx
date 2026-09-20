@@ -15,13 +15,15 @@ import {
   Briefcase,
   Zap,
   Sliders,
-  TrendingUp
+  TrendingUp,
+  Activity
 } from 'lucide-react';
 import { Breadcrumb } from '../common/Breadcrumb';
 import { StatusBadge } from '../common/StatusBadge';
 import { useAppStore } from '../../store/useAppStore';
 import { Agent, AgentDepositRequest } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
+import { TrafficDistributionMonitor } from '../admin/TrafficDistributionMonitor';
 
 export const AgentManagementView: React.FC = () => {
   const {
@@ -40,6 +42,7 @@ export const AgentManagementView: React.FC = () => {
   } = useAppStore();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isTrafficReportModalOpen, setIsTrafficReportModalOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
 
   // Form State
@@ -199,13 +202,23 @@ export const AgentManagementView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAdd}
-          className="px-3 py-1.5 bg-[#8B1E2D] hover:bg-[#721825] text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-2xs transition-colors self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Register New Subagent</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => setIsTrafficReportModalOpen(true)}
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer border border-slate-700"
+          >
+            <Activity className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Traffic Imbalance Report</span>
+          </button>
+
+          <button
+            onClick={handleOpenAdd}
+            className="px-3 py-1.5 bg-[#8B1E2D] hover:bg-[#721825] text-white text-xs font-semibold rounded flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Register New Subagent</span>
+          </button>
+        </div>
       </div>
 
       {/* Central Master Traffic Dispatcher Controls */}
@@ -821,6 +834,14 @@ export const AgentManagementView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Traffic Distribution & Imbalance Report Modal */}
+      {isTrafficReportModalOpen && (
+        <TrafficDistributionMonitor
+          isModal={true}
+          onClose={() => setIsTrafficReportModalOpen(false)}
+        />
       )}
     </div>
   );

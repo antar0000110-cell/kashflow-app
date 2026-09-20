@@ -20,7 +20,14 @@ import {
   Lock,
   Edit3,
   BellRing,
-  X
+  X,
+  Layers,
+  Radio,
+  Sparkles,
+  Filter,
+  CheckSquare,
+  Info,
+  Bell
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { formatCurrency } from '../../utils/formatters';
@@ -29,6 +36,7 @@ import { Transaction } from '../../types';
 import { formatCairoTime } from '../../utils/cairoTime';
 import { getNativePermission } from '../../services/notificationService';
 import { NotificationPermissionModal } from '../notifications/NotificationPermissionModal';
+import { socketService } from '../../services/socketService';
 
 export const AgentPortalView: React.FC = () => {
   const {
@@ -53,7 +61,43 @@ export const AgentPortalView: React.FC = () => {
   // STRICTLY LOCKED TO AUTHENTICATED AGENT (NO SWITCHER)
   const currentAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
 
-  const [activeTab, setActiveTab] = useState<'inbound_deposits' | 'inbound_withdrawals' | 'history' | 'wallets' | 'payouts'>('inbound_deposits');
+  const [activeTab, setActiveTab] = useState<'assigned_tasks' | 'inbound_deposits' | 'inbound_withdrawals' | 'history' | 'wallets' | 'payouts'>('assigned_tasks');
+  const [assignedTasksFilter, setAssignedTasksFilter] = useState<'all' | 'direct' | 'deposits' | 'withdrawals' | 'broadcasts'>('all');
+
+  // Real-time Event-Driven Scoped Notification Handler
+  const [liveAssignedAlert, setLiveAssignedAlert] = useState<{
+    id: string;
+    type: 'deposit' | 'withdrawal';
+    amount: number;
+    time: string;
+    provider?: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (!currentAgent?.id) return;
+
+    // Listen only for transactions assigned specifically to this agent
+    const unsubscribe = socketService.onAgentAssignedTransaction(currentAgent.id, (payload) => {
+      setLiveAssignedAlert({
+        id: payload.transactionId,
+        type: payload.type,
+        amount: payload.amount,
+        time: new Date().toLocaleTimeString(),
+        provider: payload.provider,
+      });
+
+      // Auto clear alert banner after 8s
+      const timer = setTimeout(() => {
+        setLiveAssignedAlert((prev) => (prev?.id === payload.transactionId ? null : prev));
+      }, 8000);
+
+      return () => clearTimeout(timer);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [currentAgent?.id]);
 
   // Synchronize with external triggers (such as mobile bottom navigation)
   React.useEffect(() => {
@@ -109,6 +153,16 @@ export const AgentPortalView: React.FC = () => {
   }
 
   // Filter orders strictly assigned to this agent
+  const directAssignedDeposits = pendingDeposits.filter((t) => t.subagentId === currentAgent.id);
+  const directAssignedWithdrawals = pendingWithdrawals.filter((t) => t.subagentId === currentAgent.id);
+  const allDirectAssignedTasks = [...directAssignedDeposits, ...directAssignedWithdrawals];
+
+  // General fallback system broadcasts (unassigned to any specific agent)
+  const systemBroadcastDeposits = pendingDeposits.filter((t) => !t.subagentId);
+  const systemBroadcastWithdrawals = pendingWithdrawals.filter((t) => !t.subagentId);
+  const allSystemBroadcastTasks = [...systemBroadcastDeposits, ...systemBroadcastWithdrawals];
+
+  // Combined agent pool
   const agentPendingDeposits = pendingDeposits.filter(
     (t) => t.subagentId === currentAgent.id || !t.subagentId
   );
@@ -357,6 +411,23 @@ export const AgentPortalView: React.FC = () => {
         <div className="border-b border-slate-200 bg-slate-50/80 px-2 sm:px-4">
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto py-2 no-scrollbar">
             <button
+              onClick={() => setActiveTab('assigned_tasks')}
+              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                activeTab === 'assigned_tasks'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-rose-400" />
+              <span>Assigned Tasks</span>
+              {allDirectAssignedTasks.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-[#8B1E2D] text-white font-mono text-[10px]">
+                  {allDirectAssignedTasks.length}
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={() => setActiveTab('inbound_deposits')}
               className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
                 activeTab === 'inbound_deposits'
@@ -432,6 +503,318 @@ export const AgentPortalView: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Tab 0: Dedicated Assigned Tasks (Separating Direct Routes from General Broadcasts) */}
+        {activeTab === 'assigned_tasks' && (
+          <div className="p-3 sm:p-5 space-y-4 text-left">
+            {/* Real-time Scoped Notification Alert Bar */}
+            {liveAssignedAlert && (
+              <div className="bg-gradient-to-r from-rose-900 to-slate-900 text-white p-3 sm:p-4 rounded-xl border border-rose-500/50 shadow-md flex items-center justify-between gap-3 animate-pulse">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-rose-600 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold flex items-center gap-1.5">
+                      <span>Direct Task Dispatched to Your Queue</span>
+                      <span className="font-mono text-[10px] bg-rose-800 px-1.5 py-0.5 rounded">
+                        {liveAssignedAlert.id}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-rose-200 mt-0.5">
+                      {liveAssignedAlert.type === 'deposit' ? 'Cash-In Deposit' : 'Cash-Out Payout'}:{' '}
+                      <strong>{formatCurrency(liveAssignedAlert.amount, currentAgent.currency || 'EGP')}</strong>{' '}
+                      • Received at {liveAssignedAlert.time}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setLiveAssignedAlert(null)}
+                  className="text-rose-300 hover:text-white p-1 rounded hover:bg-white/10 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Header & Isolation Explainer */}
+            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-[#8B1E2D]" />
+                    <span>Dedicated Agent Task Queue &amp; Direct Routing</span>
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                    Channel Isolated
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Transactions routed exclusively to agent queue{' '}
+                  <code className="bg-slate-200 text-slate-800 px-1 py-0.2 rounded font-mono text-[11px]">
+                    queue:agent:{currentAgent.id}
+                  </code>
+                  . General system broadcasts are separated below.
+                </p>
+              </div>
+
+              {/* Sub-Filters */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setAssignedTasksFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                    assignedTasksFilter === 'all'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  All Tasks ({allDirectAssignedTasks.length + allSystemBroadcastTasks.length})
+                </button>
+                <button
+                  onClick={() => setAssignedTasksFilter('direct')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                    assignedTasksFilter === 'direct'
+                      ? 'bg-[#8B1E2D] text-white'
+                      : 'bg-white text-[#8B1E2D] border border-rose-200 hover:bg-rose-50'
+                  }`}
+                >
+                  Directly Assigned ({allDirectAssignedTasks.length})
+                </button>
+                <button
+                  onClick={() => setAssignedTasksFilter('deposits')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                    assignedTasksFilter === 'deposits'
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
+                  }`}
+                >
+                  Cash-In ({directAssignedDeposits.length})
+                </button>
+                <button
+                  onClick={() => setAssignedTasksFilter('withdrawals')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                    assignedTasksFilter === 'withdrawals'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50'
+                  }`}
+                >
+                  Cash-Out ({directAssignedWithdrawals.length})
+                </button>
+                <button
+                  onClick={() => setAssignedTasksFilter('broadcasts')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                    assignedTasksFilter === 'broadcasts'
+                      ? 'bg-slate-600 text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Broadcasts ({allSystemBroadcastTasks.length})
+                </button>
+              </div>
+            </div>
+
+            {/* SECTION 1: DIRECTLY ASSIGNED TO LOGGED-IN AGENT */}
+            {assignedTasksFilter !== 'broadcasts' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#8B1E2D]" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                      ⚡ Exclusively Routed to Your Wallets ({allDirectAssignedTasks.length})
+                    </h4>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Priority Direct Dispatch
+                  </span>
+                </div>
+
+                {allDirectAssignedTasks.length === 0 ? (
+                  <div className="p-8 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400 flex flex-col items-center justify-center gap-1.5 bg-slate-50/50">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                    <span>Your direct assignment queue is all clear. No pending direct tasks.</span>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 border border-rose-200/80 rounded-xl overflow-hidden shadow-2xs bg-white">
+                    {allDirectAssignedTasks
+                      .filter((tx) => {
+                        if (assignedTasksFilter === 'deposits') return tx.type === 'deposit';
+                        if (assignedTasksFilter === 'withdrawals') return tx.type === 'withdrawal';
+                        return true;
+                      })
+                      .map((tx) => {
+                        const isDep = tx.type === 'deposit';
+                        return (
+                          <div
+                            key={tx.id}
+                            className="p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-rose-50/20 transition-colors bg-white"
+                          >
+                            <div className="space-y-1.5 text-left flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`font-mono font-bold text-sm sm:text-base ${isDep ? 'text-[#8B1E2D]' : 'text-amber-700'}`}>
+                                  {formatCurrency(tx.amount, tx.currency)}
+                                </span>
+                                <span className="font-mono font-semibold text-xs text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                  {tx.id}
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#8B1E2D] text-white flex items-center gap-1 shadow-2xs">
+                                  <Sparkles className="w-3 h-3" />
+                                  <span>DIRECT ROUTE</span>
+                                </span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  isDep
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}>
+                                  {isDep ? 'Cash-In Deposit' : 'Instant Cash-Out'}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600 border border-slate-200">
+                                  {tx.provider}
+                                </span>
+                              </div>
+
+                              <div className="text-xs text-slate-700 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <div>
+                                  Client:{' '}
+                                  <strong className="text-slate-900 font-mono select-all">
+                                    {tx.phone || tx.userInfo}
+                                  </strong>{' '}
+                                  ({tx.userFullName})
+                                </div>
+                                {tx.targetWalletId && (
+                                  <div className="text-slate-500 font-mono text-[11px]">
+                                    Assigned Wallet: <strong className="text-slate-800">{tx.targetWalletId}</strong>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="text-[11px] text-slate-400 font-mono">
+                                Dispatched: {tx.dateOfCreation || formatCairoTime(tx.createdAt)} • Queue: queue:agent:{currentAgent.id}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 shrink-0 self-stretch sm:self-auto">
+                              <button
+                                onClick={() => handleCopy(tx.phone || tx.targetWalletId || tx.userInfo)}
+                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 border border-slate-300 transition-colors cursor-pointer"
+                                title="Copy Client/Wallet Phone"
+                              >
+                                {copiedText === (tx.phone || tx.targetWalletId || tx.userInfo) ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                                <span>Copy</span>
+                              </button>
+
+                              {isDep ? (
+                                <button
+                                  onClick={() => handleOpenDepositConfirm(tx)}
+                                  className="flex-1 sm:flex-initial px-3.5 py-1.5 bg-[#8B1E2D] hover:bg-[#721825] text-white rounded-lg text-xs font-bold shadow-2xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Confirm Deposit (Adjust Amount)</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setSelectedWithdrawalForConfirm(tx)}
+                                  className="flex-1 sm:flex-initial px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-2xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Execute Cash-Out</span>
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => setOrderToReject({ id: tx.id, type: isDep ? 'deposit' : 'withdrawal' })}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer border border-transparent hover:border-rose-200"
+                                title="Reject Order"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SECTION 2: GENERAL SYSTEM BROADCASTS (UNASSIGNED FALLBACK POOL) */}
+            {(assignedTasksFilter === 'all' || assignedTasksFilter === 'broadcasts') && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      🌐 General System Broadcasts (Unassigned Fallback Pool) ({allSystemBroadcastTasks.length})
+                    </h4>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    Open pool / Not locked to a specific agent
+                  </span>
+                </div>
+
+                {allSystemBroadcastTasks.length === 0 ? (
+                  <div className="p-6 border border-slate-200 rounded-xl text-center text-xs text-slate-400 bg-slate-50/50">
+                    No open broadcast orders in the system fallback queue.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white">
+                    {allSystemBroadcastTasks.map((tx) => {
+                      const isDep = tx.type === 'deposit';
+                      return (
+                        <div
+                          key={tx.id}
+                          className="p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors bg-white"
+                        >
+                          <div className="space-y-1 text-left flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-mono font-bold text-xs sm:text-sm text-slate-800">
+                                {formatCurrency(tx.amount, tx.currency)}
+                              </span>
+                              <span className="font-mono text-xs text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {tx.id}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                Global Broadcast
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                                {tx.provider}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-600">
+                              Client: <strong className="font-mono text-slate-800">{tx.phone || tx.userInfo}</strong> ({tx.userFullName})
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            {isDep ? (
+                              <button
+                                onClick={() => handleOpenDepositConfirm(tx)}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                              >
+                                Accept &amp; Process Deposit
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setSelectedWithdrawalForConfirm(tx)}
+                                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                              >
+                                Accept &amp; Execute Cash-Out
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tab 1: Inbound Deposits (Agent CAN edit deposit amount upon confirmation) */}
         {activeTab === 'inbound_deposits' && (
