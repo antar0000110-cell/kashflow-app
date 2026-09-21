@@ -199,7 +199,15 @@ apiRouter.post('/transactions', requireAuth, (req: AuthenticatedRequest, res: Re
 
 apiRouter.patch('/transactions/:id/status', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
   const { id } = req.params;
-  const { status, processedBy, rejectionReason } = req.body;
+  const {
+    status,
+    processedBy,
+    rejectionReason,
+    amount: customAmount,
+    processingDurationSeconds,
+    processingDurationFormatted,
+    processedAt
+  } = req.body;
   const user = req.user!;
 
   const existingTx = db.getTransactionById(id);
@@ -214,10 +222,40 @@ apiRouter.patch('/transactions/:id/status', requireAuth, (req: AuthenticatedRequ
     return;
   }
 
+  // Strictly prevent agents from tampering with already finalized/completed transactions
+  if (user.role === 'agent' && (existingTx.status === 'Approved' || existingTx.status === 'Rejected' || existingTx.status === 'Cancelled')) {
+    res.status(400).json({ success: false, message: 'Finalized transactions cannot be modified by agents. Only administrators may modify settled records.' });
+    return;
+  }
+
+  // Calculate immutable processing duration
+  const createdAtMs = new Date(existingTx.createdAt || existingTx.dateOfCreation || Date.now()).getTime();
+  const nowMs = Date.now();
+  const elapsedSec = processingDurationSeconds !== undefined
+    ? Number(processingDurationSeconds)
+    : Math.max(0, Math.floor((nowMs - (isNaN(createdAtMs) ? nowMs : createdAtMs)) / 1000));
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const calcFormattedDuration = (s: number) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return h > 0 ? `${pad(h)}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+  };
+
+  const finalDurationFormatted = processingDurationFormatted || calcFormattedDuration(elapsedSec);
+  const finalAmount = customAmount !== undefined && Number(customAmount) > 0 ? Number(customAmount) : existingTx.amount;
+
   const updates: any = {
     status,
+    amount: finalAmount,
     processedBy: processedBy || user.name || user.username,
     processedByRole: user.role,
+    processedAt: processedAt || new Date().toISOString(),
+    processingDurationSeconds: elapsedSec,
+    processingDurationFormatted: finalDurationFormatted,
+    duration: finalDurationFormatted,
+    processingTimeMinutes: Math.max(1, Math.round(elapsedSec / 60)),
     timeOfProcessing: new Date().toLocaleTimeString('en-US', { hour12: false }),
   };
 
@@ -225,29 +263,56 @@ apiRouter.patch('/transactions/:id/status', requireAuth, (req: AuthenticatedRequ
     updates.rejectionReason = rejectionReason;
   }
 
-  // If Approved, update agent balance and wallet totals
+  // If Approved, update agent balance, profit balance, and wallet totals
   if (status === 'Approved' && existingTx.status !== 'Approved') {
     if (existingTx.subagentId) {
       const agent = db.getAgentById(existingTx.subagentId);
       if (agent) {
-        const delta = existingTx.type === 'deposit' ? existingTx.amount : -existingTx.amount;
+        const delta = existingTx.type === 'deposit' ? finalAmount : -finalAmount;
         const newBalance = Math.max(0, agent.currentBalance + delta);
+
+        // Calculate profit based on agent's individual deposit / withdrawal commission rates
+        const isDeposit = existingTx.type === 'deposit';
+        const commissionPercent = isDeposit
+          ? (agent.depositCommissionPercent !== undefined ? Number(agent.depositCommissionPercent) : 3.0)
+          : (agent.withdrawalCommissionPercent !== undefined ? Number(agent.withdrawalCommissionPercent) : 1.0);
+
+        const profitEarned = Number(((finalAmount * commissionPercent) / 100).toFixed(2));
+        const newProfitBalance = Number(((agent.profitBalance || 0) + profitEarned).toFixed(2));
+        const newTotalEarned = Number(((agent.totalEarnedCommission || 0) + profitEarned).toFixed(2));
+
+        updates.commissionEarned = profitEarned;
+        updates.commissionRateApplied = commissionPercent;
+
         db.updateAgent(agent.id, {
           currentBalance: newBalance,
+          profitBalance: newProfitBalance,
+          totalEarnedCommission: newTotalEarned,
           todayProcessedCount: (agent.todayProcessedCount || 0) + 1,
+          processedOrdersCount: (agent.processedOrdersCount || 0) + 1,
+          todayAssignedVolumeEGP: (agent.todayAssignedVolumeEGP || 0) + finalAmount,
+          processedVolume: (agent.processedVolume || 0) + finalAmount,
           lastActiveAt: new Date().toISOString()
         });
-        realtime.broadcast('agent:updated', { id: agent.id, currentBalance: newBalance });
+
+        realtime.broadcast('agent:updated', { 
+          id: agent.id, 
+          currentBalance: newBalance,
+          profitBalance: newProfitBalance,
+          totalEarnedCommission: newTotalEarned,
+          todayProcessedCount: (agent.todayProcessedCount || 0) + 1,
+          processedOrdersCount: (agent.processedOrdersCount || 0) + 1,
+        });
       }
     }
 
     if (existingTx.targetWalletId) {
       const wallet = db.getWallets().find((w) => w.walletNumber === existingTx.targetWalletId || w.id === existingTx.targetWalletId);
       if (wallet) {
-        const newBal = wallet.balance + (existingTx.type === 'deposit' ? existingTx.amount : -existingTx.amount);
+        const newBal = wallet.balance + (existingTx.type === 'deposit' ? finalAmount : -finalAmount);
         db.updateWallet(wallet.id, {
           balance: newBal,
-          todayReceived: wallet.todayReceived + (existingTx.type === 'deposit' ? existingTx.amount : 0)
+          todayReceived: wallet.todayReceived + (existingTx.type === 'deposit' ? finalAmount : 0)
         });
         realtime.broadcast('wallet:updated', { id: wallet.id, balance: newBal });
       }

@@ -23,6 +23,7 @@ import {
 import { formatCurrency } from '../../utils/formatters';
 import { exportToExcel, exportToCsv, ReportRowData } from '../../utils/excelExport';
 import { formatCairoTime } from '../../utils/cairoTime';
+import { aggregateVolumeByCurrency } from '../../utils/reportUtils';
 
 type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'custom';
 
@@ -121,6 +122,11 @@ export const FinancialReportsView: React.FC = () => {
       };
     });
   }, [agents, depositHistory, withdrawalHistory, agentPayouts, commissionRates, reportPeriod]);
+
+  // Aggregated volume by currency (EGP vs USD) utility breakdown
+  const currencySummary = useMemo(() => {
+    return aggregateVolumeByCurrency(depositHistory, withdrawalHistory, agents);
+  }, [depositHistory, withdrawalHistory, agents]);
 
   // Filtered by dropdown & search
   const filteredData = useMemo(() => {
@@ -412,6 +418,64 @@ export const FinancialReportsView: React.FC = () => {
           <div className="text-[11px] text-slate-500 mt-1">
             Report Date: {cairoDateStr}
           </div>
+        </div>
+      </div>
+
+      {/* Currency Liquidity Breakdown (EGP vs USD) */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+              <Building className="w-4 h-4 text-emerald-700" />
+              <span>Liquidity Breakdown by Currency (EGP vs USD / USDT)</span>
+            </h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Real-time aggregated trading volume split across base settlement currencies per subagent account.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+              EGP Total: {formatCurrency(currencySummary.egp.totalVolume, 'EGP')}
+            </span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 font-bold">
+              USD Total: ${currencySummary.usd.totalVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {currencySummary.byAgent.map((agentCur) => (
+            <div key={agentCur.agentId} className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 text-xs space-y-2">
+              <div className="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
+                <div>
+                  <span className="font-bold text-slate-900">{agentCur.agentName}</span>
+                  <span className="text-[10px] text-slate-500 font-mono ml-1.5">({agentCur.agentId})</span>
+                </div>
+                <span className="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold bg-white border border-slate-300 text-slate-800">
+                  Base: {agentCur.baseCurrency}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                <div className="p-1.5 bg-emerald-50/60 rounded border border-emerald-200/60">
+                  <div className="text-[10px] font-sans text-emerald-800 font-semibold">EGP Volume</div>
+                  <div className="font-bold text-emerald-900 mt-0.5">{formatCurrency(agentCur.egpTotalVolume, 'EGP')}</div>
+                </div>
+
+                <div className="p-1.5 bg-blue-50/60 rounded border border-blue-200/60">
+                  <div className="text-[10px] font-sans text-blue-800 font-semibold">USD Volume</div>
+                  <div className="font-bold text-blue-900 mt-0.5">
+                    ${agentCur.usdTotalVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                <span>Orders Processed: <strong className="text-slate-800 font-mono">{agentCur.totalOrdersCount}</strong></span>
+                <span>Grand Total: <strong className="text-slate-900 font-mono">{formatCurrency(agentCur.grandTotalVolume, agentCur.baseCurrency)}</strong></span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

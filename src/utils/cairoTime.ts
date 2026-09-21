@@ -79,3 +79,26 @@ export function formatSecondsToCountdown(seconds: number): string {
   const secs = seconds % 60;
   return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
+
+export function getElapsedSeconds(startDate: string | Date | number, endDate: string | Date | number = new Date()): number {
+  try {
+    const start = typeof startDate === 'string' || typeof startDate === 'number' ? new Date(startDate) : startDate;
+    const end = typeof endDate === 'string' || typeof endDate === 'number' ? new Date(endDate) : endDate;
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+    return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+  } catch {
+    return 0;
+  }
+}
+
+export function formatTimerHHMMSS(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds < 0) return '00h 00m 00s';
+  const hrs = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = Math.floor(totalSeconds % 60);
+
+  if (hrs > 0) {
+    return `${hrs}h ${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+  }
+  return `${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
+}

@@ -37,15 +37,62 @@ export const PendingDepositsView: React.FC = () => {
     setInspectingTransaction,
   } = useAppStore();
 
+  // Load persisted filters from local storage
+  const savedFilters = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('uzx_pending_deposits_filters');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   // Filters state
-  const [dateFilter, setDateFilter] = useState('2026-09');
-  const [filterId, setFilterId] = useState('');
-  const [filterUserId, setFilterUserId] = useState('');
-  const [filterUserInfo, setFilterUserInfo] = useState('');
-  const [filterProvider, setFilterProvider] = useState('all');
-  const [filterPartner, setFilterPartner] = useState('all');
-  const [filterBank, setFilterBank] = useState('all');
-  const [filterCurrency, setFilterCurrency] = useState('all');
+  const [dateFilter, setDateFilter] = useState(savedFilters?.dateFilter ?? '2026-09');
+  const [filterId, setFilterId] = useState(savedFilters?.filterId ?? '');
+  const [filterUserId, setFilterUserId] = useState(savedFilters?.filterUserId ?? '');
+  const [filterUserInfo, setFilterUserInfo] = useState(savedFilters?.filterUserInfo ?? '');
+  const [filterAgentSearch, setFilterAgentSearch] = useState(savedFilters?.filterAgentSearch ?? '');
+  const [minAmount, setMinAmount] = useState(savedFilters?.minAmount ?? '');
+  const [maxAmount, setMaxAmount] = useState(savedFilters?.maxAmount ?? '');
+  const [filterProvider, setFilterProvider] = useState(savedFilters?.filterProvider ?? 'all');
+  const [filterPartner, setFilterPartner] = useState(savedFilters?.filterPartner ?? 'all');
+  const [filterBank, setFilterBank] = useState(savedFilters?.filterBank ?? 'all');
+  const [filterCurrency, setFilterCurrency] = useState(savedFilters?.filterCurrency ?? 'all');
+
+  // Persist filters to local state on change
+  useEffect(() => {
+    try {
+      const filtersToSave = {
+        dateFilter,
+        filterId,
+        filterUserId,
+        filterUserInfo,
+        filterAgentSearch,
+        minAmount,
+        maxAmount,
+        filterProvider,
+        filterPartner,
+        filterBank,
+        filterCurrency,
+      };
+      localStorage.setItem('uzx_pending_deposits_filters', JSON.stringify(filtersToSave));
+    } catch (e) {
+      console.warn('Failed to save deposit filter state to local storage', e);
+    }
+  }, [
+    dateFilter,
+    filterId,
+    filterUserId,
+    filterUserInfo,
+    filterAgentSearch,
+    minAmount,
+    maxAmount,
+    filterProvider,
+    filterPartner,
+    filterBank,
+    filterCurrency,
+  ]);
 
   // Column visibility
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
@@ -99,6 +146,21 @@ export const PendingDepositsView: React.FC = () => {
       ) {
         return false;
       }
+      if (filterAgentSearch) {
+        const q = filterAgentSearch.toLowerCase();
+        const matchAgent =
+          tx.adminName?.toLowerCase().includes(q) ||
+          tx.subagentName?.toLowerCase().includes(q) ||
+          tx.subagentId?.toLowerCase().includes(q) ||
+          tx.processedBy?.toLowerCase().includes(q);
+        if (!matchAgent) return false;
+      }
+      if (minAmount !== '' && !isNaN(Number(minAmount)) && tx.amount < Number(minAmount)) {
+        return false;
+      }
+      if (maxAmount !== '' && !isNaN(Number(maxAmount)) && tx.amount > Number(maxAmount)) {
+        return false;
+      }
       if (filterProvider !== 'all' && tx.provider !== filterProvider) return false;
       if (filterBank !== 'all' && tx.bankName !== filterBank) return false;
       if (filterPartner !== 'all' && tx.subagentId !== filterPartner) return false;
@@ -110,6 +172,9 @@ export const PendingDepositsView: React.FC = () => {
     filterId,
     filterUserId,
     filterUserInfo,
+    filterAgentSearch,
+    minAmount,
+    maxAmount,
     filterProvider,
     filterBank,
     filterPartner,
@@ -126,11 +191,17 @@ export const PendingDepositsView: React.FC = () => {
     setFilterId('');
     setFilterUserId('');
     setFilterUserInfo('');
+    setFilterAgentSearch('');
+    setMinAmount('');
+    setMaxAmount('');
     setFilterProvider('all');
     setFilterPartner('all');
     setFilterBank('all');
     setFilterCurrency('all');
     setCurrentPage(1);
+    try {
+      localStorage.removeItem('uzx_pending_deposits_filters');
+    } catch {}
   };
 
   const handleExportCSV = () => {
@@ -166,6 +237,40 @@ export const PendingDepositsView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Global Currency Filter Toolbar */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-300 shadow-2xs">
+            <button
+              onClick={() => { setFilterCurrency('all'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                filterCurrency === 'all'
+                  ? 'bg-[#8B1E2D] text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All Currencies
+            </button>
+            <button
+              onClick={() => { setFilterCurrency('EGP'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                filterCurrency === 'EGP'
+                  ? 'bg-emerald-700 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              🇪🇬 EGP Only
+            </button>
+            <button
+              onClick={() => { setFilterCurrency('USD'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                filterCurrency === 'USD'
+                  ? 'bg-blue-700 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              🇺🇸 USD / USDT
+            </button>
+          </div>
+
           <label className="flex items-center gap-1.5 text-xs text-slate-600 bg-white px-2.5 py-1.5 rounded border border-slate-300 shadow-2xs cursor-pointer">
             <input
               type="checkbox"
@@ -268,7 +373,40 @@ export const PendingDepositsView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Subagent</label>
+            <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Agent / Partner Search</label>
+            <input
+              type="text"
+              placeholder="Agent name..."
+              value={filterAgentSearch}
+              onChange={(e) => setFilterAgentSearch(e.target.value)}
+              className="w-full h-7 px-2 border border-slate-300 rounded bg-white text-slate-800 text-xs focus:ring-1 focus:ring-[#8B1E2D]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Min Amount</label>
+            <input
+              type="number"
+              placeholder="e.g. 500"
+              value={minAmount}
+              onChange={(e) => setMinAmount(e.target.value)}
+              className="w-full h-7 px-2 border border-slate-300 rounded bg-white text-slate-800 text-xs focus:ring-1 focus:ring-[#8B1E2D]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Max Amount</label>
+            <input
+              type="number"
+              placeholder="e.g. 50000"
+              value={maxAmount}
+              onChange={(e) => setMaxAmount(e.target.value)}
+              className="w-full h-7 px-2 border border-slate-300 rounded bg-white text-slate-800 text-xs focus:ring-1 focus:ring-[#8B1E2D]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Subagent Dropdown</label>
             <select
               value={filterPartner}
               onChange={(e) => setFilterPartner(e.target.value)}

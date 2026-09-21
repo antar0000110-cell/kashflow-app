@@ -4,6 +4,13 @@ export type TransactionStatus = 'Pending' | 'Processing' | 'Approved' | 'Rejecte
 
 export type TransactionType = 'deposit' | 'withdrawal' | 'transfer';
 
+export interface CommissionTier {
+  id: string;
+  minVolume: number;
+  maxVolume: number; // 0 or Infinity for unlimited
+  ratePercent: number;
+}
+
 export interface BankAccount {
   id: string;
   bankName: string;
@@ -30,8 +37,14 @@ export interface Transaction {
   dateOfCreation: string; // Real-time Cairo formatted string
   timeOfDeposit?: string;
   timeOfProcessing?: string;
+  processedAt?: string; // ISO string when order was finalized
+  processingDurationSeconds?: number; // Exact elapsed seconds from creation to approval/rejection
+  processingDurationFormatted?: string; // HH:MM:SS or Xm Ys formatted
+  duration?: string; // Permanently locked processing time string e.g. "02m 45s"
   processingTimeMinutes: number;
   processingTimeDisplay?: string;
+  commissionEarned?: number; // Real-time profit credited to agent
+  commissionRateApplied?: number; // Rate percentage used at processing time
   adminName?: string;
   subagentId?: string;
   subagentName?: string;
@@ -111,8 +124,13 @@ export interface Agent {
   depositMethod?: string;
   depositPaymentAddress: string;
   depositAddress?: string;
-  depositCommissionPercent?: number; // e.g. 3%
-  withdrawalCommissionPercent?: number; // e.g. 1%
+  depositCommissionPercent?: number; // e.g. 3% (نسبة أرباح الإيداع)
+  withdrawalCommissionPercent?: number; // e.g. 1% (نسبة أرباح السحب)
+  useTieredCommission?: boolean; // Enable volume-based tiered rate structure
+  depositTiers?: CommissionTier[]; // Tiered rates based on deposit volume threshold
+  withdrawalTiers?: CommissionTier[]; // Tiered rates based on withdrawal volume threshold
+  profitBalance?: number; // Current accumulated profit balance from processed deposits and withdrawals (رصيد الأرباح)
+  totalEarnedCommission?: number; // Lifetime total profit/commission earned
   currency?: string; // e.g. EGP, USD, USDT, USDC
   customCurrencyName?: string;
   password?: string;

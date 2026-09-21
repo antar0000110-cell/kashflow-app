@@ -32,7 +32,13 @@ export interface SocketClient {
 
 class RealtimeSocketService implements SocketClient {
   public connected: boolean = false;
+  public isPaused: boolean = false;
   public socketId: string = '';
+
+  public setPaused(paused: boolean) {
+    this.isPaused = paused;
+    console.log(`[Realtime WebSocket] Real-time sync set to: ${paused ? 'PAUSED' : 'ACTIVE'}`);
+  }
   public subscriptions: Set<string> = new Set();
 
   private ws: WebSocket | null = null;
@@ -288,6 +294,11 @@ class RealtimeSocketService implements SocketClient {
   }
 
   private triggerListeners(event: string, ...args: any[]) {
+    if (this.isPaused && event !== 'connect' && event !== 'disconnect') {
+      console.log(`[Realtime WebSocket] Paused mode active — ignoring incoming event "${event}"`);
+      return;
+    }
+
     const payload = args[0];
     const matchingSubscribers = this.subscribers.filter((s) => s.event === event);
 

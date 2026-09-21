@@ -23,10 +23,10 @@ import {
   SIMULATION_WALLET_POOL
 } from '../services/mockData';
 import { generateOtpCode, generateRandomId, generateHash, generateTimeBasedOtp } from '../utils/formatters';
-import { formatCairoTime } from '../utils/cairoTime';
+import { socketService } from '../services/socketService';
+import { formatCairoTime, getElapsedSeconds, formatTimerHHMMSS } from '../utils/cairoTime';
 import { soundManager } from '../utils/soundAlerts';
 import { sendNativePushNotification } from '../services/notificationService';
-import { socketService } from '../services/socketService';
 import { apiService } from '../services/api';
 import { routeAssignmentService } from '../services/RouteAssignmentService';
 import { startAutoRefresh, stopAutoRefresh, setOnRefreshLogout } from '../utils/tokenRefresh';
@@ -66,6 +66,7 @@ export type AppSection =
   | 'mobile-apk-wallet'
   | 'bot-engine'
   | 'agent-payouts'
+  | 'agent-audit'
   | 'domain-settings';
 
 export interface AppStoreState {
@@ -118,6 +119,8 @@ export interface AppStoreState {
   globalTrafficActive: boolean;
   soundEnabled: boolean;
   autoUpdateEnabled: boolean;
+  isRealtimeSyncPaused: boolean;
+  toggleRealtimeSync: () => void;
   totalSimulatedWalletsCount: number;
   lastPulseTime: number;
 
@@ -506,59 +509,13 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     enableSubdomainRouting: true,
     sslEnabled: true,
   },
-  agentPayouts: loadPersistedData(STORAGE_KEYS.PERSISTED_AGENT_PAYOUTS, [
-    {
-      id: 'PAY-891023',
-      agentId: 'AGT-01',
-      agentName: 'Ahmed Hassan (Alex Hub)',
-      amount: 4500,
-      currency: 'EGP',
-      payoutType: 'commission',
-      paymentMethod: 'Vodafone Cash 01031860138',
-      referenceNumber: 'VF-PAY-98124',
-      notes: 'Weekly deposit commission payout settled',
-      processedBy: 'Master Administrator',
-      createdAt: '2026-09-18 14:30:00',
-    },
-    {
-      id: 'PAY-891024',
-      agentId: 'AGT-02',
-      agentName: 'Mohamed Tarek (Cairo Central)',
-      amount: 6200,
-      currency: 'EGP',
-      payoutType: 'commission',
-      paymentMethod: 'InstaPay m.tarek@instapay',
-      referenceNumber: 'IP-PAY-11093',
-      notes: 'Monthly commission settlement',
-      processedBy: 'Master Administrator',
-      createdAt: '2026-09-17 19:15:00',
-    },
-  ]),
+  agentPayouts: loadPersistedData(STORAGE_KEYS.PERSISTED_AGENT_PAYOUTS, []),
   totalSimulatedWalletsCount: 6000,
   lastPulseTime: Date.now(),
-  notifications: [
-    {
-      id: 'NOTIF-1',
-      title: 'Wallet Login Code Requested',
-      message: 'OTP login code requested for wallet 01031860138 (Agent Ahmed). OTP Code: 849201',
-      timestamp: new Date().toISOString(),
-      type: 'info',
-      targetSection: 'agent-management',
-      isRead: false,
-    },
-    {
-      id: 'NOTIF-2',
-      title: 'New Insurance Deposit Request',
-      message: 'Agent Mohamed requested 10,000 EGP insurance top-up to resume traffic dispatch.',
-      timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
-      type: 'warning',
-      targetSection: 'agent-management',
-      isRead: false,
-    }
-  ],
+  notifications: [],
   botConfig: {
-    isRunning: true,
-    enabled: true,
+    isRunning: false,
+    enabled: false,
     intervalSeconds: 20,
     minAmount: 30,
     maxAmount: 1500,
@@ -570,20 +527,43 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     targetDepositPercent: 70,
     ratioJitterPercent: 10,
     effectiveTodayDepositRatio: 0.70,
-    todayDepositsGenerated: 14,
-    todayWithdrawalsGenerated: 6,
+    todayDepositsGenerated: 0,
+    todayWithdrawalsGenerated: 0,
     autoCancelHours: 4,
     autoPauseInactiveHours: 2,
     totalWalletPoolTarget: 6000,
     selectedProviders: ['Vodafone Cash', 'InstaPay', 'Orange Cash', 'Etisalat Cash'],
     selectedBanks: ['Vodafone 9253', 'Vodafone 7655', 'Vodafone 2055', 'InstaPay 9021']
   },
-  globalTrafficActive: true,
+  globalTrafficActive: false,
   soundEnabled: true,
   autoUpdateEnabled: true,
+  isRealtimeSyncPaused: false,
 
-  setActiveSection: (section) => set({ activeSection: section, isMobileDrawerOpen: false }),
-  setActivePortal: (portal) => set({ activePortal: portal }),
+  toggleRealtimeSync: () =>
+    set((state) => {
+      const nextPaused = !state.isRealtimeSyncPaused;
+      socketService.setPaused(nextPaused);
+      return { isRealtimeSyncPaused: nextPaused };
+    }),
+
+  setActiveSection: (section) =>
+    set((state) => {
+      if (state.authRole === 'agent') {
+        console.warn('[SECURITY GUARD] Agent role cannot navigate to admin sections.');
+        return { activeSection: 'agent-portal', activePortal: 'agent', isMobileDrawerOpen: false };
+      }
+      return { activeSection: section, isMobileDrawerOpen: false };
+    }),
+
+  setActivePortal: (portal) =>
+    set((state) => {
+      if (state.authRole === 'agent' && portal !== 'agent') {
+        console.warn('[SECURITY GUARD] Agent role cannot switch portal to admin.');
+        return { activePortal: 'agent', activeSection: 'agent-portal' };
+      }
+      return { activePortal: portal };
+    }),
   setSelectedAgentId: (agentId) => set({ selectedAgentId: agentId }),
   setProductionMode: (isProd) => set({ isProductionMode: isProd }),
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen, isSidebarCollapsed: !state.isSidebarCollapsed })),
@@ -677,21 +657,51 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     const tx = pendingDeposits.find((t) => t.id === transactionId);
     if (!tx) return;
 
-    const finalAmount = customAmount !== undefined && customAmount > 0 ? customAmount : tx.amount;
-
-    const createdTime = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now() - 3 * 60000;
-    const elapsedMs = Math.max(0, Date.now() - createdTime);
-    const elapsedSec = Math.floor(elapsedMs / 1000);
+    const finalAmount = customAmount !== undefined && customAmount > 0 ? Number(customAmount) : tx.amount;
+    const now = new Date();
+    const elapsedSec = getElapsedSeconds(tx.createdAt || tx.dateOfCreation || now, now);
+    const elapsedFormatted = formatTimerHHMMSS(elapsedSec);
     const elapsedMin = Math.max(1, Math.round(elapsedSec / 60));
-    const elapsedFormatted = elapsedSec < 60 ? `${elapsedSec}s` : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`;
+
+    let updatedAgents = agents;
+    let earnedDepositProfit = 0;
+    let appliedRate = 3.0;
+
+    if (tx.subagentId) {
+      updatedAgents = agents.map((a) => {
+        if (a.id === tx.subagentId) {
+          const depositPercent = a.depositCommissionPercent !== undefined ? Number(a.depositCommissionPercent) : 3.0;
+          appliedRate = depositPercent;
+          const depositProfit = Number(((finalAmount * depositPercent) / 100).toFixed(2));
+          earnedDepositProfit = depositProfit;
+          return {
+            ...a,
+            todayProcessedCount: a.todayProcessedCount + 1,
+            processedOrdersCount: (a.processedOrdersCount || 0) + 1,
+            todayAssignedVolumeEGP: a.todayAssignedVolumeEGP + finalAmount,
+            processedVolume: (a.processedVolume || 0) + finalAmount,
+            profitBalance: Number(((a.profitBalance || 0) + depositProfit).toFixed(2)),
+            totalEarnedCommission: Number(((a.totalEarnedCommission || 0) + depositProfit).toFixed(2)),
+            lastActiveAt: new Date().toISOString(),
+          };
+        }
+        return a;
+      });
+    }
 
     const updatedTx: Transaction = {
       ...tx,
       amount: finalAmount,
       status: 'Approved',
-      timeOfProcessing: formatCairoTime(new Date()),
+      timeOfProcessing: formatCairoTime(now),
+      processedAt: now.toISOString(),
+      processingDurationSeconds: elapsedSec,
+      processingDurationFormatted: elapsedFormatted,
+      duration: elapsedFormatted,
       processingTimeMinutes: elapsedMin,
       processingTimeDisplay: elapsedFormatted,
+      commissionEarned: earnedDepositProfit,
+      commissionRateApplied: appliedRate,
       processedBy: processedBy,
       processedByRole: processedByRole,
       userInfo: customAmount !== undefined && customAmount !== tx.amount
@@ -714,22 +724,6 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       );
     }
 
-    let updatedAgents = agents;
-    if (tx.subagentId) {
-      updatedAgents = agents.map((a) =>
-        a.id === tx.subagentId
-          ? {
-              ...a,
-              todayProcessedCount: a.todayProcessedCount + 1,
-              processedOrdersCount: (a.processedOrdersCount || 0) + 1,
-              todayAssignedVolumeEGP: a.todayAssignedVolumeEGP + finalAmount,
-              processedVolume: (a.processedVolume || 0) + finalAmount,
-              lastActiveAt: new Date().toISOString(),
-            }
-          : a
-      );
-    }
-
     set({
       pendingDeposits: pendingDeposits.filter((t) => t.id !== transactionId),
       depositHistory: [updatedTx, ...depositHistory],
@@ -742,11 +736,19 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       routeAssignmentService.dequeueTransaction(tx.subagentId, tx.id);
     }
 
+    // Persist to backend
+    apiService.updateTransactionStatus(transactionId, 'Approved', processedBy, undefined, {
+      amount: finalAmount,
+      processingDurationSeconds: elapsedSec,
+      processingDurationFormatted: elapsedFormatted,
+      processedAt: now.toISOString(),
+    }).catch(() => {});
+
     soundManager.playTransactionChime();
 
     addNotification({
       title: 'Deposit Order Confirmed',
-      message: `Deposit of ${finalAmount} ${tx.currency} (Order ${tx.id}) approved by ${processedBy}.`,
+      message: `Deposit of ${finalAmount} ${tx.currency} (Order ${tx.id}) approved by ${processedBy}. Profit: +${earnedDepositProfit} ${tx.currency}`,
       type: 'success',
       targetSection: 'pending-deposits',
       targetAgentId: tx.subagentId,
@@ -760,16 +762,19 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     const tx = pendingDeposits.find((t) => t.id === transactionId);
     if (!tx) return;
 
-    const createdTime = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now() - 3 * 60000;
-    const elapsedMs = Math.max(0, Date.now() - createdTime);
-    const elapsedSec = Math.floor(elapsedMs / 1000);
+    const now = new Date();
+    const elapsedSec = getElapsedSeconds(tx.createdAt || tx.dateOfCreation || now, now);
+    const elapsedFormatted = formatTimerHHMMSS(elapsedSec);
     const elapsedMin = Math.max(1, Math.round(elapsedSec / 60));
-    const elapsedFormatted = elapsedSec < 60 ? `${elapsedSec}s` : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`;
 
     const updatedTx: Transaction = {
       ...tx,
       status: 'Rejected',
-      timeOfProcessing: formatCairoTime(new Date()),
+      timeOfProcessing: formatCairoTime(now),
+      processedAt: now.toISOString(),
+      processingDurationSeconds: elapsedSec,
+      processingDurationFormatted: elapsedFormatted,
+      duration: elapsedFormatted,
       processingTimeMinutes: elapsedMin,
       processingTimeDisplay: elapsedFormatted,
       processedBy: processedBy,
@@ -788,6 +793,13 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       routeAssignmentService.dequeueTransaction(tx.subagentId, tx.id);
     }
 
+    // Persist to backend
+    apiService.updateTransactionStatus(transactionId, 'Rejected', processedBy, reason, {
+      processingDurationSeconds: elapsedSec,
+      processingDurationFormatted: elapsedFormatted,
+      processedAt: now.toISOString(),
+    }).catch(() => {});
+
     addNotification({
       title: 'Deposit Order Rejected',
       message: `Order ${tx.id} for ${tx.amount} ${tx.currency} was rejected by ${processedBy}. Reason: ${reason}`,
@@ -804,18 +816,49 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     const tx = pendingWithdrawals.find((t) => t.id === transactionId);
     if (!tx) return;
 
-    const createdTime = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now() - 3 * 60000;
-    const elapsedMs = Math.max(0, Date.now() - createdTime);
-    const elapsedSec = Math.floor(elapsedMs / 1000);
+    const now = new Date();
+    const elapsedSec = getElapsedSeconds(tx.createdAt || tx.dateOfCreation || now, now);
+    const elapsedFormatted = formatTimerHHMMSS(elapsedSec);
     const elapsedMin = Math.max(1, Math.round(elapsedSec / 60));
-    const elapsedFormatted = elapsedSec < 60 ? `${elapsedSec}s` : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`;
+
+    let updatedAgents = agents;
+    let earnedWithdrawalProfit = 0;
+    let appliedRate = 1.0;
+
+    if (tx.subagentId) {
+      updatedAgents = agents.map((a) => {
+        if (a.id === tx.subagentId) {
+          const wdlPercent = a.withdrawalCommissionPercent !== undefined ? Number(a.withdrawalCommissionPercent) : 1.0;
+          appliedRate = wdlPercent;
+          const wdlProfit = Number(((tx.amount * wdlPercent) / 100).toFixed(2));
+          earnedWithdrawalProfit = wdlProfit;
+          return {
+            ...a,
+            todayProcessedCount: a.todayProcessedCount + 1,
+            processedOrdersCount: (a.processedOrdersCount || 0) + 1,
+            todayAssignedVolumeEGP: a.todayAssignedVolumeEGP + tx.amount,
+            processedVolume: (a.processedVolume || 0) + tx.amount,
+            profitBalance: Number(((a.profitBalance || 0) + wdlProfit).toFixed(2)),
+            totalEarnedCommission: Number(((a.totalEarnedCommission || 0) + wdlProfit).toFixed(2)),
+            lastActiveAt: new Date().toISOString(),
+          };
+        }
+        return a;
+      });
+    }
 
     const updatedTx: Transaction = {
       ...tx,
       status: 'Approved',
-      timeOfProcessing: formatCairoTime(new Date()),
+      timeOfProcessing: formatCairoTime(now),
+      processedAt: now.toISOString(),
+      processingDurationSeconds: elapsedSec,
+      processingDurationFormatted: elapsedFormatted,
+      duration: elapsedFormatted,
       processingTimeMinutes: elapsedMin,
       processingTimeDisplay: elapsedFormatted,
+      commissionEarned: earnedWithdrawalProfit,
+      commissionRateApplied: appliedRate,
       processedBy: processedBy,
       processedByRole: processedByRole,
     };
@@ -834,19 +877,6 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       );
     }
 
-    let updatedAgents = agents;
-    if (tx.subagentId) {
-      updatedAgents = agents.map((a) =>
-        a.id === tx.subagentId
-          ? {
-              ...a,
-              todayProcessedCount: a.todayProcessedCount + 1,
-              lastActiveAt: new Date().toISOString(),
-            }
-          : a
-      );
-    }
-
     set({
       pendingWithdrawals: pendingWithdrawals.filter((t) => t.id !== transactionId),
       withdrawalHistory: [updatedTx, ...withdrawalHistory],
@@ -859,11 +889,19 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       routeAssignmentService.dequeueTransaction(tx.subagentId, tx.id);
     }
 
+    // Persist to backend
+    apiService.updateTransactionStatus(transactionId, 'Approved', processedBy, undefined, {
+      amount: tx.amount,
+      processingDurationSeconds: elapsedSec,
+      processingDurationFormatted: elapsedFormatted,
+      processedAt: now.toISOString(),
+    }).catch(() => {});
+
     soundManager.playTransactionChime();
 
     addNotification({
       title: 'Withdrawal Confirmed',
-      message: `Withdrawal of ${tx.amount} ${tx.currency} (Order ${tx.id}) dispatched by ${processedBy}.`,
+      message: `Withdrawal of ${tx.amount} ${tx.currency} (Order ${tx.id}) dispatched by ${processedBy}. Profit: +${earnedWithdrawalProfit} ${tx.currency}`,
       type: 'success',
       targetSection: 'pending-withdrawals',
       targetAgentId: tx.subagentId,
@@ -877,16 +915,19 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     const tx = pendingWithdrawals.find((t) => t.id === transactionId);
     if (!tx) return;
 
-    const createdTime = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now() - 3 * 60000;
-    const elapsedMs = Math.max(0, Date.now() - createdTime);
-    const elapsedSec = Math.floor(elapsedMs / 1000);
+    const now = new Date();
+    const elapsedSec = getElapsedSeconds(tx.createdAt || tx.dateOfCreation || now, now);
+    const elapsedFormatted = formatTimerHHMMSS(elapsedSec);
     const elapsedMin = Math.max(1, Math.round(elapsedSec / 60));
-    const elapsedFormatted = elapsedSec < 60 ? `${elapsedSec}s` : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`;
 
     const updatedTx: Transaction = {
       ...tx,
       status: 'Rejected',
-      timeOfProcessing: formatCairoTime(new Date()),
+      timeOfProcessing: formatCairoTime(now),
+      processedAt: now.toISOString(),
+      processingDurationSeconds: elapsedSec,
+      processingDurationFormatted: elapsedFormatted,
+      duration: elapsedFormatted,
       processingTimeMinutes: elapsedMin,
       processingTimeDisplay: elapsedFormatted,
       processedBy: processedBy,
@@ -904,6 +945,13 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     if (tx.subagentId) {
       routeAssignmentService.dequeueTransaction(tx.subagentId, tx.id);
     }
+
+    // Persist to backend
+    apiService.updateTransactionStatus(transactionId, 'Rejected', processedBy, reason, {
+      processingDurationSeconds: elapsedSec,
+      processingDurationFormatted: elapsedFormatted,
+      processedAt: now.toISOString(),
+    }).catch(() => {});
 
     addNotification({
       title: 'Withdrawal Rejected',
@@ -1035,6 +1083,10 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     const newAgent: Agent = {
       ...agentData,
       id: newAgentId,
+      depositCommissionPercent: agentData.depositCommissionPercent !== undefined ? Number(agentData.depositCommissionPercent) : 3.0,
+      withdrawalCommissionPercent: agentData.withdrawalCommissionPercent !== undefined ? Number(agentData.withdrawalCommissionPercent) : 1.0,
+      profitBalance: 0,
+      totalEarnedCommission: 0,
       todayProcessedCount: 0,
       todayAssignedOrders: 0,
       todayAssignedVolumeEGP: 0,
@@ -1904,6 +1956,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         return {
           ...a,
           currentBalance: a.currentBalance + amount,
+          profitBalance: Math.max(0, (a.profitBalance || 0) - amount),
           totalPaidCommission: (a.totalPaidCommission || 0) + amount,
         };
       }

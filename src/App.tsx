@@ -11,6 +11,7 @@ import { ListOfBanksView } from './components/operations/ListOfBanksView';
 import { PaymentQueriesView } from './components/operations/PaymentQueriesView';
 import { AgentManagementView } from './components/agent/AgentManagementView';
 import { AgentPortalView } from './components/agent/AgentPortalView';
+import { AgentAuditView } from './components/agent/AgentAuditView';
 import { WalletPoolView } from './components/wallet/WalletPoolView';
 import { MobileApkWalletView } from './components/wallet/MobileApkWalletView';
 import { BotEngineView } from './components/bot/BotEngineView';
@@ -147,8 +148,12 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
   }
 
   const renderContent = () => {
-    // If logged in as Agent:
-    if (authRole === 'agent' || activePortal === 'agent') {
+    // SECURITY GUARD: Strictly lock Agent role to AgentPortalView to prevent unauthorized access to Admin routes
+    if (authRole === 'agent') {
+      return <AgentPortalView />;
+    }
+
+    if (activePortal === 'agent') {
       return <AgentPortalView />;
     }
 
@@ -180,6 +185,8 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
         return <AgentManagementView />;
       case 'agent-portal':
         return <AgentPortalView />;
+      case 'agent-audit':
+        return <AgentAuditView />;
       case 'wallet-pool':
       case 'user-wallets':
         return <WalletPoolView />;

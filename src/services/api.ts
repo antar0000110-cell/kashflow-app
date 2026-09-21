@@ -149,12 +149,23 @@ class ApiService {
     id: string,
     status: string,
     processedBy?: string,
-    rejectionReason?: string
+    rejectionReason?: string,
+    extraData?: {
+      amount?: number;
+      processingDurationSeconds?: number;
+      processingDurationFormatted?: string;
+      processedAt?: string;
+    }
   ): Promise<any> {
     try {
       const res = await this.request(`/api/transactions/${id}/status`, {
         method: 'PATCH',
-        body: JSON.stringify({ status, processedBy, rejectionReason }),
+        body: JSON.stringify({
+          status,
+          processedBy,
+          rejectionReason,
+          ...extraData,
+        }),
       });
       const json = await res.json();
       return json.transaction;

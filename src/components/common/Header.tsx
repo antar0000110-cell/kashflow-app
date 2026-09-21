@@ -89,34 +89,38 @@ export const Header: React.FC = () => {
       <div className="px-3 sm:px-4 md:px-6 h-14 flex items-center justify-between gap-2">
         {/* Brand & Drawer Toggle */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <button
-            onClick={toggleMobileDrawer}
-            className="md:hidden p-2 rounded-lg text-slate-300 hover:text-white hover:bg-[#334155] focus:outline-none min-w-[40px] min-h-[40px] flex items-center justify-center cursor-pointer transition-colors"
-            title="Navigation Menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          {authRole === 'admin' && (
+            <button
+              onClick={toggleMobileDrawer}
+              className="md:hidden p-2 rounded-lg text-slate-300 hover:text-white hover:bg-[#334155] focus:outline-none min-w-[40px] min-h-[40px] flex items-center justify-center cursor-pointer transition-colors"
+              title="Navigation Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
 
           <div
             onClick={() => {
-              setActivePortal('admin');
-              setActiveSection('dashboard');
+              if (authRole === 'admin') {
+                setActivePortal('admin');
+                setActiveSection('dashboard');
+              }
             }}
-            className="flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none group"
+            className={`flex items-center gap-2 sm:gap-2.5 select-none ${authRole === 'admin' ? 'cursor-pointer group' : 'cursor-default'}`}
           >
             {/* Fintech Brand Emblem with Official UZX Wallet Logo */}
             <img
               src="/uzx-logo.png"
               alt="UZX Wallet Logo"
-              className="w-8 h-8 rounded-lg object-contain shadow-sm transition-transform group-hover:scale-105 shrink-0 bg-white/10 p-0.5"
+              className="w-8 h-8 rounded-lg object-contain shadow-sm shrink-0 bg-white/10 p-0.5"
               referrerPolicy="no-referrer"
             />
             <div className="flex flex-col text-left">
               <span className="font-extrabold tracking-widest text-xs sm:text-sm text-white flex items-center gap-1">
-                UZX <span className="text-rose-400 font-bold">OS</span>
+                UZX <span className="text-rose-400 font-bold">{authRole === 'admin' ? 'OS' : 'AGENT'}</span>
               </span>
               <span className="text-[9px] text-slate-400 font-mono tracking-tight hidden sm:block">
-                EGYPT REAL-TIME FINANCIAL OS
+                {authRole === 'admin' ? 'EGYPT REAL-TIME FINANCIAL OS' : 'AUTHORIZED AGENT TERMINAL'}
               </span>
             </div>
           </div>
@@ -124,15 +128,17 @@ export const Header: React.FC = () => {
 
         {/* Right Status Actions */}
         <div className="flex items-center gap-2 md:gap-3">
-          {/* Quick Dispatch Order Button */}
-          <button
-            onClick={() => setIsDispatchModalOpen(true)}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-[#8B1E2D] hover:bg-[#721825] text-white text-xs font-semibold rounded shadow-2xs transition-colors"
-            title="Open standardized customer order dispatch form"
-          >
-            <Send className="w-3.5 h-3.5 text-rose-200" />
-            <span>Dispatch Order</span>
-          </button>
+          {/* Quick Dispatch Order Button (Admin Only) */}
+          {authRole === 'admin' && (
+            <button
+              onClick={() => setIsDispatchModalOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-[#8B1E2D] hover:bg-[#721825] text-white text-xs font-semibold rounded shadow-2xs transition-colors"
+              title="Open standardized customer order dispatch form"
+            >
+              <Send className="w-3.5 h-3.5 text-rose-200" />
+              <span>Dispatch Order</span>
+            </button>
+          )}
 
           {/* Cairo Real-Time Clock */}
           <div className="hidden xl:flex items-center gap-1.5 text-xs text-gray-300 bg-[#0F172A] px-2.5 py-1 rounded border border-[#334155]">
@@ -173,21 +179,23 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          {/* Global Traffic Switch */}
-          <div className="hidden sm:flex items-center gap-2 bg-[#0F172A] px-2.5 py-1 rounded border border-[#334155] text-xs">
-            <span className="text-gray-400 text-[11px]">Traffic:</span>
-            <button
-              onClick={() => setGlobalTraffic(!globalTrafficActive)}
-              className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 transition-colors ${
-                globalTrafficActive
-                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                  : 'bg-rose-950 text-rose-300 border border-rose-800'
-              }`}
-            >
-              <Power className="w-2.5 h-2.5" />
-              {globalTrafficActive ? 'LIVE' : 'PAUSED'}
-            </button>
-          </div>
+          {/* Global Traffic Switch (Admin Only) */}
+          {authRole === 'admin' && (
+            <div className="hidden sm:flex items-center gap-2 bg-[#0F172A] px-2.5 py-1 rounded border border-[#334155] text-xs">
+              <span className="text-gray-400 text-[11px]">Traffic:</span>
+              <button
+                onClick={() => setGlobalTraffic(!globalTrafficActive)}
+                className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 transition-colors ${
+                  globalTrafficActive
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                    : 'bg-rose-950 text-rose-300 border border-rose-800'
+                }`}
+              >
+                <Power className="w-2.5 h-2.5" />
+                {globalTrafficActive ? 'LIVE' : 'PAUSED'}
+              </button>
+            </div>
+          )}
 
           {/* Push Notifications Permission Status Trigger */}
           {pushPermission !== 'granted' ? (

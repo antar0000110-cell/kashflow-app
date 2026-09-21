@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, FileSpreadsheet, RotateCcw, Eye, Download } from 'lucide-react';
 import { Breadcrumb } from '../common/Breadcrumb';
 import { StatusBadge } from '../common/StatusBadge';
@@ -12,11 +12,30 @@ import { formatCairoTime } from '../../utils/cairoTime';
 export const DepositRequestsView: React.FC = () => {
   const { depositHistory, setInspectingTransaction } = useAppStore();
 
-  const [filterId, setFilterId] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const savedFilters = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('uzx_deposit_history_filters');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const [filterId, setFilterId] = useState(savedFilters?.filterId ?? '');
+  const [filterAgentName, setFilterAgentName] = useState(savedFilters?.filterAgentName ?? '');
+  const [minAmount, setMinAmount] = useState(savedFilters?.minAmount ?? '');
+  const [maxAmount, setMaxAmount] = useState(savedFilters?.maxAmount ?? '');
+  const [filterStatus, setFilterStatus] = useState(savedFilters?.filterStatus ?? 'all');
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    try {
+      const toSave = { filterId, filterAgentName, minAmount, maxAmount, filterStatus };
+      localStorage.setItem('uzx_deposit_history_filters', JSON.stringify(toSave));
+    } catch {}
+  }, [filterId, filterAgentName, minAmount, maxAmount, filterStatus]);
 
   const [columns, setColumns] = useState<ColumnDefinition[]>([
     { key: 'transactionId', label: 'Order ID', visible: true },
@@ -40,6 +59,17 @@ export const DepositRequestsView: React.FC = () => {
 
   const filteredData = depositHistory.filter((t) => {
     if (filterId && !t.id.toLowerCase().includes(filterId.toLowerCase()) && !t.userId.toLowerCase().includes(filterId.toLowerCase())) return false;
+    if (filterAgentName) {
+      const q = filterAgentName.toLowerCase();
+      const matchAgent =
+        t.subagentName?.toLowerCase().includes(q) ||
+        t.subagentId?.toLowerCase().includes(q) ||
+        t.adminName?.toLowerCase().includes(q) ||
+        t.processedBy?.toLowerCase().includes(q);
+      if (!matchAgent) return false;
+    }
+    if (minAmount !== '' && !isNaN(Number(minAmount)) && t.amount < Number(minAmount)) return false;
+    if (maxAmount !== '' && !isNaN(Number(maxAmount)) && t.amount > Number(maxAmount)) return false;
     if (filterStatus !== 'all' && t.status !== filterStatus) return false;
     return true;
   });
@@ -79,43 +109,81 @@ export const DepositRequestsView: React.FC = () => {
       </div>
 
       {/* Filter Row */}
-      <div className="bg-white p-3 rounded border border-slate-200 shadow-2xs flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-[200px]">
+      <div className="bg-white p-3 rounded border border-slate-200 shadow-2xs space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
             <input
               type="text"
-              placeholder="Search by Order ID or User ID..."
+              placeholder="Search Transaction ID or User ID..."
               value={filterId}
               onChange={(e) => setFilterId(e.target.value)}
               className="w-full h-7 pl-8 pr-2 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:ring-1 focus:ring-[#8B1E2D]"
             />
           </div>
+
+          <div>
+            <input
+              type="text"
+              placeholder="Agent Name..."
+              value={filterAgentName}
+              onChange={(e) => setFilterAgentName(e.target.value)}
+              className="w-full h-7 px-2 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:ring-1 focus:ring-[#8B1E2D]"
+            />
+          </div>
+
+          <div>
+            <input
+              type="number"
+              placeholder="Min Amount EGP"
+              value={minAmount}
+              onChange={(e) => setMinAmount(e.target.value)}
+              className="w-full h-7 px-2 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:ring-1 focus:ring-[#8B1E2D]"
+            />
+          </div>
+
+          <div>
+            <input
+              type="number"
+              placeholder="Max Amount EGP"
+              value={maxAmount}
+              onChange={(e) => setMaxAmount(e.target.value)}
+              className="w-full h-7 px-2 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:ring-1 focus:ring-[#8B1E2D]"
+            />
+          </div>
+
+          <div>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full h-7 px-2 border border-slate-300 rounded text-xs bg-white text-slate-800"
+            >
+              <option value="all">All Statuses</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
 
-        <div className="w-40">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full h-7 px-2 border border-slate-300 rounded text-xs bg-white text-slate-800"
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={() => {
+              setFilterId('');
+              setFilterAgentName('');
+              setMinAmount('');
+              setMaxAmount('');
+              setFilterStatus('all');
+              try {
+                localStorage.removeItem('uzx_deposit_history_filters');
+              } catch {}
+            }}
+            className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded flex items-center gap-1"
           >
-            <option value="all">All Statuses</option>
-            <option value="Approved">Approved</option>
-            <option value="Rejected">Rejected</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
+            <RotateCcw className="w-3 h-3" />
+            <span>Reset</span>
+          </button>
         </div>
-
-        <button
-          onClick={() => {
-            setFilterId('');
-            setFilterStatus('all');
-          }}
-          className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded flex items-center gap-1"
-        >
-          <RotateCcw className="w-3 h-3" />
-          <span>Reset</span>
-        </button>
       </div>
 
       {/* Table */}

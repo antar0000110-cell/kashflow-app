@@ -21,7 +21,7 @@ import {
 import { Breadcrumb } from '../common/Breadcrumb';
 import { StatusBadge } from '../common/StatusBadge';
 import { useAppStore } from '../../store/useAppStore';
-import { Agent, AgentDepositRequest } from '../../types';
+import { Agent, AgentDepositRequest, CommissionTier } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { TrafficDistributionMonitor } from '../admin/TrafficDistributionMonitor';
 
@@ -59,6 +59,17 @@ export const AgentManagementView: React.FC = () => {
   const [dailyMoneyCap, setDailyMoneyCap] = useState(100000);
   const [depositCommission, setDepositCommission] = useState(3.0);
   const [withdrawalCommission, setWithdrawalCommission] = useState(1.0);
+  const [useTieredCommission, setUseTieredCommission] = useState(false);
+  const [depositTiers, setDepositTiers] = useState<CommissionTier[]>([
+    { id: 'dt1', minVolume: 0, maxVolume: 50000, ratePercent: 2.0 },
+    { id: 'dt2', minVolume: 50001, maxVolume: 200000, ratePercent: 3.0 },
+    { id: 'dt3', minVolume: 200001, maxVolume: 0, ratePercent: 4.0 },
+  ]);
+  const [withdrawalTiers, setWithdrawalTiers] = useState<CommissionTier[]>([
+    { id: 'wt1', minVolume: 0, maxVolume: 50000, ratePercent: 1.0 },
+    { id: 'wt2', minVolume: 50001, maxVolume: 200000, ratePercent: 1.5 },
+    { id: 'wt3', minVolume: 200001, maxVolume: 0, ratePercent: 2.0 },
+  ]);
   const [currency, setCurrency] = useState('EGP');
   const [depositMethod, setDepositMethod] = useState('Vodafone Cash');
   const [depositAddress, setDepositAddress] = useState('01031860138');
@@ -77,6 +88,7 @@ export const AgentManagementView: React.FC = () => {
   const totalInsurance = agents.reduce((acc, a) => acc + a.insuranceDeposit, 0);
   const totalProcessed = agents.reduce((acc, a) => acc + (a.processedOrdersCount || a.todayProcessedCount || 0), 0);
   const totalVolume = agents.reduce((acc, a) => acc + (a.processedVolume || a.todayAssignedVolumeEGP || 0), 0);
+  const totalAgentProfits = agents.reduce((acc, a) => acc + (a.profitBalance || 0), 0);
 
   const handleOpenAdd = () => {
     setEditingAgent(null);
@@ -93,6 +105,17 @@ export const AgentManagementView: React.FC = () => {
     setDailyMoneyCap(100000);
     setDepositCommission(3.0);
     setWithdrawalCommission(1.0);
+    setUseTieredCommission(false);
+    setDepositTiers([
+      { id: 'dt1', minVolume: 0, maxVolume: 50000, ratePercent: 2.0 },
+      { id: 'dt2', minVolume: 50001, maxVolume: 200000, ratePercent: 3.0 },
+      { id: 'dt3', minVolume: 200001, maxVolume: 0, ratePercent: 4.0 },
+    ]);
+    setWithdrawalTiers([
+      { id: 'wt1', minVolume: 0, maxVolume: 50000, ratePercent: 1.0 },
+      { id: 'wt2', minVolume: 50001, maxVolume: 200000, ratePercent: 1.5 },
+      { id: 'wt3', minVolume: 200001, maxVolume: 0, ratePercent: 2.0 },
+    ]);
     setCurrency('EGP');
     setDepositMethod(paymentMethods[0] || 'Vodafone Cash');
     setDepositAddress('01031860138');
@@ -114,6 +137,25 @@ export const AgentManagementView: React.FC = () => {
     setDailyMoneyCap(a.dailyOrderLimit?.dailyMoneyCap || 50000);
     setDepositCommission(a.depositCommissionPercent !== undefined ? a.depositCommissionPercent : 3.0);
     setWithdrawalCommission(a.withdrawalCommissionPercent !== undefined ? a.withdrawalCommissionPercent : 1.0);
+    setUseTieredCommission(!!a.useTieredCommission);
+    setDepositTiers(
+      a.depositTiers?.length
+        ? a.depositTiers
+        : [
+            { id: 'dt1', minVolume: 0, maxVolume: 50000, ratePercent: 2.0 },
+            { id: 'dt2', minVolume: 50001, maxVolume: 200000, ratePercent: 3.0 },
+            { id: 'dt3', minVolume: 200001, maxVolume: 0, ratePercent: 4.0 },
+          ]
+    );
+    setWithdrawalTiers(
+      a.withdrawalTiers?.length
+        ? a.withdrawalTiers
+        : [
+            { id: 'wt1', minVolume: 0, maxVolume: 50000, ratePercent: 1.0 },
+            { id: 'wt2', minVolume: 50001, maxVolume: 200000, ratePercent: 1.5 },
+            { id: 'wt3', minVolume: 200001, maxVolume: 0, ratePercent: 2.0 },
+          ]
+    );
     setCurrency(a.currency || 'EGP');
     setDepositMethod(a.depositMethod || a.depositPaymentMethod || 'Vodafone Cash');
     setDepositAddress(a.depositAddress || a.depositPaymentAddress || '01031860138');
@@ -136,6 +178,9 @@ export const AgentManagementView: React.FC = () => {
         speedMode,
         depositCommissionPercent: Number(depositCommission),
         withdrawalCommissionPercent: Number(withdrawalCommission),
+        useTieredCommission,
+        depositTiers,
+        withdrawalTiers,
         currency,
         dailyOrderLimit: {
           min: dailyMin,
@@ -164,6 +209,9 @@ export const AgentManagementView: React.FC = () => {
         dailyVolumeMaxEGP: dailyMoneyCap,
         depositCommissionPercent: Number(depositCommission),
         withdrawalCommissionPercent: Number(withdrawalCommission),
+        useTieredCommission,
+        depositTiers,
+        withdrawalTiers,
         currency,
         depositPaymentMethod: depositMethod,
         depositPaymentAddress: depositAddress,
@@ -264,7 +312,7 @@ export const AgentManagementView: React.FC = () => {
       </div>
 
       {/* Network Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="bg-white p-3.5 rounded border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[11px] font-bold uppercase tracking-wider">Total Agents</span>
@@ -286,6 +334,19 @@ export const AgentManagementView: React.FC = () => {
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             Available insurance balance
+          </div>
+        </div>
+
+        <div className="bg-white p-3.5 rounded border border-slate-200 shadow-2xs">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Total Agent Profits</span>
+            <DollarSign className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-lg font-bold font-mono text-emerald-700">
+            {formatCurrency(totalAgentProfits, 'EGP')}
+          </div>
+          <div className="text-[11px] text-emerald-600 font-medium mt-1">
+            Accumulated commissions
           </div>
         </div>
 
@@ -366,7 +427,8 @@ export const AgentManagementView: React.FC = () => {
               <tr className="bg-slate-100 text-slate-700 border-b border-slate-200 select-none">
                 <th className="py-2.5 px-3 font-semibold text-[11px]">Subagent Name</th>
                 <th className="py-2.5 px-3 font-semibold text-[11px]">Insurance Collateral</th>
-                <th className="py-2.5 px-3 font-semibold text-[11px]">Admin Commission (%)</th>
+                <th className="py-2.5 px-3 font-semibold text-[11px]">Profit Balance (رصيد الأرباح)</th>
+                <th className="py-2.5 px-3 font-semibold text-[11px]">Commission Rates (%)</th>
                 <th className="py-2.5 px-3 font-semibold text-[11px]">Currency</th>
                 <th className="py-2.5 px-3 font-semibold text-[11px]">Daily Order Quota</th>
                 <th className="py-2.5 px-3 font-semibold text-[11px]">Daily Money Cap</th>
@@ -390,14 +452,33 @@ export const AgentManagementView: React.FC = () => {
                       {formatCurrency(agent.insuranceDeposit, agent.currency || 'EGP')}
                     </td>
 
+                    <td className="py-2.5 px-3 font-mono">
+                      <div className="font-bold text-emerald-700 text-[12px]">
+                        +{formatCurrency(agent.profitBalance || 0, agent.currency || 'EGP')}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Total: {formatCurrency(agent.totalEarnedCommission || agent.profitBalance || 0, agent.currency || 'EGP')}
+                      </div>
+                    </td>
+
                     <td className="py-2.5 px-3">
                       <div className="font-mono text-[11px] space-y-0.5">
-                        <div className="text-emerald-700 font-semibold">
-                          Dep: <span className="font-bold">{agent.depositCommissionPercent !== undefined ? agent.depositCommissionPercent : 3.0}%</span>
+                        <div className="text-emerald-700 font-semibold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                          <span>Deposit: <b>{agent.depositCommissionPercent !== undefined ? agent.depositCommissionPercent : 3.0}%</b></span>
                         </div>
-                        <div className="text-blue-700 font-semibold">
-                          Wdl: <span className="font-bold">{agent.withdrawalCommissionPercent !== undefined ? agent.withdrawalCommissionPercent : 1.0}%</span>
+                        <div className="text-blue-700 font-semibold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>
+                          <span>Withdraw: <b>{agent.withdrawalCommissionPercent !== undefined ? agent.withdrawalCommissionPercent : 1.0}%</b></span>
                         </div>
+                        {agent.useTieredCommission && (
+                          <div className="mt-1">
+                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[9px] font-sans font-bold flex items-center gap-1 w-fit">
+                              <TrendingUp className="w-2.5 h-2.5 text-amber-700" />
+                              <span>Tiered ({agent.depositTiers?.length || 0} Deposit / {agent.withdrawalTiers?.length || 0} Withdrawal Tiers)</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </td>
 
@@ -692,12 +773,14 @@ export const AgentManagementView: React.FC = () => {
               <div className="border-t border-slate-200 pt-3">
                 <h4 className="font-bold text-slate-900 text-xs mb-2 flex items-center gap-1.5 text-[#8B1E2D]">
                   <DollarSign className="w-3.5 h-3.5" />
-                  <span>Admin Commission Rates & Currency</span>
+                  <span>Agent Commission Rates & Profit Calculation (نسب الأرباح)</span>
                 </h4>
 
                 <div className="grid grid-cols-3 gap-2.5">
                   <div>
-                    <label className="block text-slate-600 font-semibold mb-1">Deposit Commission (%)</label>
+                    <label className="block text-slate-600 font-semibold mb-1">
+                      Deposit Commission (%) <span className="text-emerald-600 font-normal">(أرباح الإيداع)</span>
+                    </label>
                     <input
                       type="number"
                       step="0.1"
@@ -707,7 +790,9 @@ export const AgentManagementView: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-600 font-semibold mb-1">Withdrawal Commission (%)</label>
+                    <label className="block text-slate-600 font-semibold mb-1">
+                      Withdrawal Commission (%) <span className="text-blue-600 font-normal">(أرباح السحب)</span>
+                    </label>
                     <input
                       type="number"
                       step="0.1"
@@ -717,14 +802,250 @@ export const AgentManagementView: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-600 font-semibold mb-1">Currency Code</label>
-                    <input
-                      type="text"
+                    <label className="block text-slate-600 font-semibold mb-1">Currency Code (العملة)</label>
+                    <select
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value.toUpperCase())}
-                      placeholder="EGP / USD / USDT"
-                      className="w-full h-8 px-2 border border-slate-300 rounded font-mono font-bold"
+                      className="w-full h-8 px-2 border border-slate-300 rounded font-mono font-bold bg-white text-slate-800 cursor-pointer"
+                    >
+                      <option value="EGP">EGP - Egyptian Pound (الجنيه المصري)</option>
+                      <option value="USD">USD - US Dollar (الدولار الأمريكي)</option>
+                      <option value="USDT">USDT - Tether (دولار رقمي)</option>
+                      <option value="EUR">EUR - Euro (يورو)</option>
+                      <option value="SAR">SAR - Saudi Riyal (ريال سعودي)</option>
+                      <option value="AED">AED - UAE Dirham (درهم إماراتي)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tiered Commission Toggle and Editor */}
+                <div className="mt-3 p-3 bg-amber-50/50 border border-amber-200 rounded space-y-3 text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={useTieredCommission}
+                      onChange={(e) => setUseTieredCommission(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#8B1E2D] focus:ring-[#8B1E2D]"
                     />
+                    <div>
+                      <span className="font-bold text-slate-900">
+                        Enable Tiered Volume Commission (هيكلية العمولات المتدرجة حسب حجم المعاملات)
+                      </span>
+                      <p className="text-[11px] text-slate-600">
+                        When enabled, agent commission rates automatically scale based on transaction volume thresholds.
+                      </p>
+                    </div>
+                  </label>
+
+                  {useTieredCommission && (
+                    <div className="space-y-4 pt-2 border-t border-amber-200/60">
+                      {/* Deposit Tiers */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-emerald-800 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            <span>Deposit Volume Tiers (شرائح عمولات الإيداع)</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const lastTier = depositTiers[depositTiers.length - 1];
+                              const nextMin = lastTier ? (lastTier.maxVolume || 200000) + 1 : 0;
+                              setDepositTiers([
+                                ...depositTiers,
+                                { id: `dt_${Date.now()}`, minVolume: nextMin, maxVolume: 0, ratePercent: 4.5 },
+                              ]);
+                            }}
+                            className="px-2 py-0.5 text-[10px] bg-emerald-700 text-white rounded hover:bg-emerald-800 font-semibold"
+                          >
+                            + Add Deposit Tier
+                          </button>
+                        </div>
+
+                        <div className="bg-white rounded border border-slate-200 overflow-hidden text-slate-800">
+                          <table className="w-full text-left border-collapse text-[11px]">
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                                <th className="p-1.5">Min Volume ({currency})</th>
+                                <th className="p-1.5">Max Volume (0 = ∞)</th>
+                                <th className="p-1.5">Commission Rate (%)</th>
+                                <th className="p-1.5 text-center w-10">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {depositTiers.map((tier) => (
+                                <tr key={tier.id} className="border-b border-slate-100">
+                                  <td className="p-1">
+                                    <input
+                                      type="number"
+                                      value={tier.minVolume}
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        setDepositTiers((prev) =>
+                                          prev.map((t) => (t.id === tier.id ? { ...t, minVolume: val } : t))
+                                        );
+                                      }}
+                                      className="w-full h-6 px-1 border border-slate-300 rounded font-mono text-[11px]"
+                                    />
+                                  </td>
+                                  <td className="p-1">
+                                    <input
+                                      type="number"
+                                      value={tier.maxVolume}
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        setDepositTiers((prev) =>
+                                          prev.map((t) => (t.id === tier.id ? { ...t, maxVolume: val } : t))
+                                        );
+                                      }}
+                                      className="w-full h-6 px-1 border border-slate-300 rounded font-mono text-[11px]"
+                                    />
+                                  </td>
+                                  <td className="p-1">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={tier.ratePercent}
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        setDepositTiers((prev) =>
+                                          prev.map((t) => (t.id === tier.id ? { ...t, ratePercent: val } : t))
+                                        );
+                                      }}
+                                      className="w-full h-6 px-1 border border-slate-300 rounded font-mono font-bold text-emerald-700 text-[11px]"
+                                    />
+                                  </td>
+                                  <td className="p-1 text-center">
+                                    {depositTiers.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setDepositTiers((prev) => prev.filter((t) => t.id !== tier.id))
+                                        }
+                                        className="text-red-500 hover:text-red-700 p-0.5"
+                                      >
+                                        <XCircle className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Withdrawal Tiers */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-blue-800 text-[11px] uppercase tracking-wider flex items-center gap-1">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            <span>Withdrawal Volume Tiers (شرائح عمولات السحب)</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const lastTier = withdrawalTiers[withdrawalTiers.length - 1];
+                              const nextMin = lastTier ? (lastTier.maxVolume || 200000) + 1 : 0;
+                              setWithdrawalTiers([
+                                ...withdrawalTiers,
+                                { id: `wt_${Date.now()}`, minVolume: nextMin, maxVolume: 0, ratePercent: 2.5 },
+                              ]);
+                            }}
+                            className="px-2 py-0.5 text-[10px] bg-blue-700 text-white rounded hover:bg-blue-800 font-semibold"
+                          >
+                            + Add Withdrawal Tier
+                          </button>
+                        </div>
+
+                        <div className="bg-white rounded border border-slate-200 overflow-hidden text-slate-800">
+                          <table className="w-full text-left border-collapse text-[11px]">
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                                <th className="p-1.5">Min Volume ({currency})</th>
+                                <th className="p-1.5">Max Volume (0 = ∞)</th>
+                                <th className="p-1.5">Commission Rate (%)</th>
+                                <th className="p-1.5 text-center w-10">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {withdrawalTiers.map((tier) => (
+                                <tr key={tier.id} className="border-b border-slate-100">
+                                  <td className="p-1">
+                                    <input
+                                      type="number"
+                                      value={tier.minVolume}
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        setWithdrawalTiers((prev) =>
+                                          prev.map((t) => (t.id === tier.id ? { ...t, minVolume: val } : t))
+                                        );
+                                      }}
+                                      className="w-full h-6 px-1 border border-slate-300 rounded font-mono text-[11px]"
+                                    />
+                                  </td>
+                                  <td className="p-1">
+                                    <input
+                                      type="number"
+                                      value={tier.maxVolume}
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        setWithdrawalTiers((prev) =>
+                                          prev.map((t) => (t.id === tier.id ? { ...t, maxVolume: val } : t))
+                                        );
+                                      }}
+                                      className="w-full h-6 px-1 border border-slate-300 rounded font-mono text-[11px]"
+                                    />
+                                  </td>
+                                  <td className="p-1">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={tier.ratePercent}
+                                      onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        setWithdrawalTiers((prev) =>
+                                          prev.map((t) => (t.id === tier.id ? { ...t, ratePercent: val } : t))
+                                        );
+                                      }}
+                                      className="w-full h-6 px-1 border border-slate-300 rounded font-mono font-bold text-blue-700 text-[11px]"
+                                    />
+                                  </td>
+                                  <td className="p-1 text-center">
+                                    {withdrawalTiers.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setWithdrawalTiers((prev) => prev.filter((t) => t.id !== tier.id))
+                                        }
+                                        className="text-red-500 hover:text-red-700 p-0.5"
+                                      >
+                                        <XCircle className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Live Profit Calculation Preview Banner */}
+                <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded text-[11px] space-y-1 font-mono">
+                  <div className="text-slate-500 font-sans font-semibold text-[10px] uppercase tracking-wider">
+                    Automated Profit Credit Preview (معاينة حساب الأرباح التلقائي):
+                  </div>
+                  <div className="flex items-center justify-between text-emerald-700">
+                    <span>Deposit (إيداع) 1,000 {currency} × {depositCommission}% =</span>
+                    <span className="font-bold">+{((1000 * (depositCommission || 0)) / 100).toFixed(2)} {currency} to profit</span>
+                  </div>
+                  <div className="flex items-center justify-between text-blue-700">
+                    <span>Withdrawal (سحب) 300 {currency} × {withdrawalCommission}% =</span>
+                    <span className="font-bold">+{((300 * (withdrawalCommission || 0)) / 100).toFixed(2)} {currency} to profit</span>
                   </div>
                 </div>
 

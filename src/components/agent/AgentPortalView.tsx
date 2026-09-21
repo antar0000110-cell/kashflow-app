@@ -37,6 +37,7 @@ import { formatCairoTime } from '../../utils/cairoTime';
 import { getNativePermission } from '../../services/notificationService';
 import { NotificationPermissionModal } from '../notifications/NotificationPermissionModal';
 import { socketService } from '../../services/socketService';
+import { OrderElapsedTimeBadge } from '../common/OrderElapsedTimeBadge';
 
 export const AgentPortalView: React.FC = () => {
   const {
@@ -61,7 +62,7 @@ export const AgentPortalView: React.FC = () => {
   // STRICTLY LOCKED TO AUTHENTICATED AGENT (NO SWITCHER)
   const currentAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
 
-  const [activeTab, setActiveTab] = useState<'assigned_tasks' | 'inbound_deposits' | 'inbound_withdrawals' | 'history' | 'wallets' | 'payouts'>('assigned_tasks');
+  const [activeTab, setActiveTab] = useState<'assigned_tasks' | 'inbound_deposits' | 'deposit_history' | 'inbound_withdrawals' | 'withdrawal_history' | 'wallets' | 'payouts'>('assigned_tasks');
   const [assignedTasksFilter, setAssignedTasksFilter] = useState<'all' | 'direct' | 'deposits' | 'withdrawals' | 'broadcasts'>('all');
 
   // Real-time Event-Driven Scoped Notification Handler
@@ -72,6 +73,8 @@ export const AgentPortalView: React.FC = () => {
     time: string;
     provider?: string;
   } | null>(null);
+
+  const [isEarningsFlashing, setIsEarningsFlashing] = useState(false);
 
   React.useEffect(() => {
     if (!currentAgent?.id) return;
@@ -94,10 +97,31 @@ export const AgentPortalView: React.FC = () => {
       return () => clearTimeout(timer);
     });
 
+    // Subscriptions to socket events for instant real-time earnings widget updates
+    const unsubTx = socketService.subscribe('transaction:updated', (payload) => {
+      if (
+        payload?.subagentId === currentAgent.id ||
+        payload?.agentId === currentAgent.id ||
+        payload?.processedBy === currentAgent.name
+      ) {
+        setIsEarningsFlashing(true);
+        setTimeout(() => setIsEarningsFlashing(false), 2500);
+      }
+    });
+
+    const unsubAgent = socketService.subscribe('agent:updated', (payload) => {
+      if (payload?.id === currentAgent.id || payload?.agentId === currentAgent.id) {
+        setIsEarningsFlashing(true);
+        setTimeout(() => setIsEarningsFlashing(false), 2500);
+      }
+    });
+
     return () => {
       unsubscribe();
+      unsubTx();
+      unsubAgent();
     };
-  }, [currentAgent?.id]);
+  }, [currentAgent?.id, currentAgent?.name]);
 
   // Synchronize with external triggers (such as mobile bottom navigation)
   React.useEffect(() => {
@@ -286,6 +310,28 @@ export const AgentPortalView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+          {/* Real-time Accrued Earnings Header Widget */}
+          <div className={`px-3 py-1.5 rounded-lg border transition-all duration-300 flex items-center gap-2 ${
+            isEarningsFlashing
+              ? 'bg-emerald-100 border-emerald-400 text-emerald-900 ring-2 ring-emerald-300 shadow-sm scale-105'
+              : 'bg-emerald-50/90 border-emerald-200 text-emerald-900'
+          }`}
+          title="Instant real-time accrued earnings across all processed orders via Socket listener"
+          >
+            <div className="w-6 h-6 rounded-md bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <DollarSign className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                <span>Accrued Earnings</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <div className="text-xs font-bold font-mono text-emerald-900 truncate">
+                +{formatCurrency(totalEarnedCommission, currentAgent.currency || 'EGP')}
+              </div>
+            </div>
+          </div>
+
           <button
             onClick={() => setIsNotificationModalOpen(true)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border cursor-pointer ${
@@ -301,28 +347,28 @@ export const AgentPortalView: React.FC = () => {
             </span>
           </button>
 
-          <button
-            onClick={() => toggleAgentTraffic(currentAgent.id)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer ${
+          <div
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border ${
               currentAgent.trafficActive
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                : 'bg-amber-50 text-amber-800 border-amber-300'
             }`}
+            title="Traffic routing is controlled exclusively by Administration"
           >
-            <Power className="w-3.5 h-3.5" />
-            <span>{currentAgent.trafficActive ? 'Traffic: Active' : 'Traffic: Paused'}</span>
-          </button>
+            <span className={`w-2 h-2 rounded-full ${currentAgent.trafficActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+            <span>{currentAgent.trafficActive ? 'Traffic Route: Active' : 'Traffic Route: Paused (Admin)'}</span>
+          </div>
         </div>
       </div>
 
       {/* Financial Status Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
         {/* Insurance Collateral */}
         <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
               <span className="truncate">Insurance Collateral</span>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-50 text-[#8B1E2D] flex items-center justify-center shrink-0">
                 <Shield className="w-4 h-4" />
               </div>
             </div>
@@ -338,19 +384,38 @@ export const AgentPortalView: React.FC = () => {
           </button>
         </div>
 
+        {/* Profit Balance (رصيد الأرباح المتراكمة) */}
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-emerald-200 shadow-2xs flex flex-col justify-between bg-gradient-to-b from-white to-emerald-50/20">
+          <div>
+            <div className="text-[10px] sm:text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <span className="truncate">Profit Balance (رصيد الأرباح)</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-sm sm:text-lg lg:text-xl font-bold font-mono text-emerald-700 truncate tracking-tight">
+              +{formatCurrency(currentAgent.profitBalance || 0, currentAgent.currency || 'EGP')}
+            </div>
+          </div>
+          <div className="text-[10px] sm:text-[11px] text-emerald-600 font-medium mt-2 truncate flex items-center gap-1">
+            <span>Lifetime:</span>
+            <span className="font-bold font-mono">+{formatCurrency(currentAgent.totalEarnedCommission || currentAgent.profitBalance || 0, currentAgent.currency || 'EGP')}</span>
+          </div>
+        </div>
+
         {/* Commission Rates */}
         <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <div>
             <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-              <span className="truncate">Commission Rate</span>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <DollarSign className="w-4 h-4" />
+              <span className="truncate">Commission Rates</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <TrendingUp className="w-4 h-4" />
               </div>
             </div>
             <div className="text-xs sm:text-sm font-bold font-mono text-slate-900 flex flex-wrap items-center gap-1.5">
-              <span className="text-emerald-700">Dep: {depCommPercent}%</span>
+              <span className="text-emerald-700 font-bold">Dep: {depCommPercent}%</span>
               <span className="text-slate-300">|</span>
-              <span className="text-blue-700">Wdl: {wdlCommPercent}%</span>
+              <span className="text-blue-700 font-bold">Wdl: {wdlCommPercent}%</span>
             </div>
           </div>
           <div className="text-[10px] sm:text-[11px] text-slate-500 mt-2 truncate">
@@ -363,16 +428,16 @@ export const AgentPortalView: React.FC = () => {
           <div>
             <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center justify-between">
               <span className="truncate">Today&apos;s Volume</span>
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <TrendingUp className="w-4 h-4" />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <Receipt className="w-4 h-4" />
               </div>
             </div>
             <div className="text-sm sm:text-lg lg:text-xl font-bold font-mono text-slate-900 truncate tracking-tight">
               {formatCurrency(currentAgent.todayAssignedVolumeEGP || currentAgent.processedVolume || 0, currentAgent.currency || 'EGP')}
             </div>
           </div>
-          <div className="text-[10px] sm:text-[11px] text-emerald-600 font-semibold mt-2 truncate">
-            Est: {formatCurrency(totalEarnedCommission, currentAgent.currency || 'EGP')}
+          <div className="text-[10px] sm:text-[11px] text-slate-500 mt-2 truncate">
+            Processed: <strong className="text-slate-800 font-mono">{currentAgent.todayProcessedCount || 0}</strong> orders
           </div>
         </div>
 
@@ -435,11 +500,28 @@ export const AgentPortalView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-200'
               }`}
             >
-              <ArrowDownLeft className="w-3.5 h-3.5" />
-              <span>Inbound Deposits (Cash-In)</span>
+              <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Pending Deposits (طلبات الإيداع)</span>
               {agentPendingDeposits.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white font-mono text-[10px]">
                   {agentPendingDeposits.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('deposit_history')}
+              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                activeTab === 'deposit_history'
+                  ? 'bg-emerald-800 text-white shadow-2xs'
+                  : 'text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Processed Deposits (سجلات الإيداع)</span>
+              {agentProcessedDeposits.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white font-mono text-[10px]">
+                  {agentProcessedDeposits.length}
                 </span>
               )}
             </button>
@@ -452,8 +534,8 @@ export const AgentPortalView: React.FC = () => {
                   : 'text-slate-600 hover:bg-slate-200'
               }`}
             >
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>Inbound Cash-Outs (Payouts)</span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-amber-300" />
+              <span>Pending Withdrawals (طلبات السحب)</span>
               {agentPendingWithdrawals.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white font-mono text-[10px]">
                   {agentPendingWithdrawals.length}
@@ -462,15 +544,20 @@ export const AgentPortalView: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('history')}
+              onClick={() => setActiveTab('withdrawal_history')}
               className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                activeTab === 'history'
-                  ? 'bg-slate-800 text-white shadow-2xs'
+                activeTab === 'withdrawal_history'
+                  ? 'bg-amber-800 text-white shadow-2xs'
                   : 'text-slate-600 hover:bg-slate-200'
               }`}
             >
-              <Receipt className="w-3.5 h-3.5" />
-              <span>Operation History</span>
+              <Receipt className="w-3.5 h-3.5 text-amber-200" />
+              <span>Processed Withdrawals (سجلات السحب)</span>
+              {agentProcessedWithdrawals.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white font-mono text-[10px]">
+                  {agentProcessedWithdrawals.length}
+                </span>
+              )}
             </button>
 
             <button
@@ -671,6 +758,13 @@ export const AgentPortalView: React.FC = () => {
                                 <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600 border border-slate-200">
                                   {tx.provider}
                                 </span>
+                                <OrderElapsedTimeBadge
+                                  createdAt={tx.createdAt}
+                                  processedAt={tx.processedAt}
+                                  processingDurationSeconds={tx.processingDurationSeconds}
+                                  processingDurationFormatted={tx.processingDurationFormatted}
+                                  status={tx.status}
+                                />
                               </div>
 
                               <div className="text-xs text-slate-700 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -690,6 +784,14 @@ export const AgentPortalView: React.FC = () => {
 
                               <div className="text-[11px] text-slate-400 font-mono">
                                 Dispatched: {tx.dateOfCreation || formatCairoTime(tx.createdAt)} • Queue: queue:agent:{currentAgent.id}
+                              </div>
+
+                              <div className="pt-1 flex items-center gap-2">
+                                <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                  <span>💰 Expected Profit (الربح المتوقع):</span>
+                                  <strong className="font-bold">+{formatCurrency((tx.amount * (isDep ? depCommPercent : wdlCommPercent)) / 100, currentAgent.currency || 'EGP')}</strong>
+                                  <span className="text-slate-500">({isDep ? depCommPercent : wdlCommPercent}%)</span>
+                                </span>
                               </div>
                             </div>
 
@@ -842,6 +944,13 @@ export const AgentPortalView: React.FC = () => {
                       <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600 border border-slate-200">
                         {tx.provider}
                       </span>
+                      <OrderElapsedTimeBadge
+                        createdAt={tx.createdAt}
+                        processedAt={tx.processedAt}
+                        processingDurationSeconds={tx.processingDurationSeconds}
+                        processingDurationFormatted={tx.processingDurationFormatted}
+                        status={tx.status}
+                      />
                     </div>
 
                     <div className="text-xs text-slate-700">
@@ -921,6 +1030,13 @@ export const AgentPortalView: React.FC = () => {
                       <span className="px-1.5 py-0.5 rounded bg-amber-50 text-[10px] font-medium text-amber-800 border border-amber-200">
                         Instant Cash-Out (Payout)
                       </span>
+                      <OrderElapsedTimeBadge
+                        createdAt={tx.createdAt}
+                        processedAt={tx.processedAt}
+                        processingDurationSeconds={tx.processingDurationSeconds}
+                        processingDurationFormatted={tx.processingDurationFormatted}
+                        status={tx.status}
+                      />
                     </div>
 
                     <div className="text-xs text-slate-700">
@@ -973,50 +1089,169 @@ export const AgentPortalView: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 3: Processed Operations History with Search */}
-        {activeTab === 'history' && (
+        {/* Tab: Processed Deposits History (سجلات الإيداع المعالجة) */}
+        {activeTab === 'deposit_history' && (
           <div className="p-3 sm:p-4 space-y-3">
             <div className="relative">
               <input
                 type="text"
                 value={historySearchQuery}
                 onChange={(e) => setHistorySearchQuery(e.target.value)}
-                placeholder="Search processed operations by Order ID, phone, or amount..."
-                className="w-full h-10 pl-9 pr-3 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-[#8B1E2D] outline-none"
+                placeholder="Search processed deposits by Order ID, client phone, or amount..."
+                className="w-full h-10 pl-9 pr-3 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-emerald-600 outline-none"
               />
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             </div>
 
-            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-              {filteredHistory.length === 0 ? (
+            <div className="divide-y divide-slate-100 border border-emerald-200/80 rounded-xl overflow-hidden bg-white">
+              {agentProcessedDeposits.filter((tx) => {
+                if (!historySearchQuery.trim()) return true;
+                const q = historySearchQuery.toLowerCase();
+                return (
+                  tx.id.toLowerCase().includes(q) ||
+                  (tx.userFullName && tx.userFullName.toLowerCase().includes(q)) ||
+                  (tx.phone && tx.phone.includes(q)) ||
+                  tx.amount.toString().includes(q)
+                );
+              }).length === 0 ? (
                 <div className="p-8 text-center text-xs text-slate-400">
-                  No processed operations match your search query.
+                  No processed deposit records found.
                 </div>
               ) : (
-                filteredHistory.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50 text-xs"
-                  >
-                    <div className="space-y-0.5 text-left">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono font-bold text-slate-900">
-                          {formatCurrency(tx.amount, tx.currency)}
-                        </span>
-                        <span className="font-mono text-slate-500">{tx.id}</span>
-                        <StatusBadge status={tx.status} />
+                agentProcessedDeposits
+                  .filter((tx) => {
+                    if (!historySearchQuery.trim()) return true;
+                    const q = historySearchQuery.toLowerCase();
+                    return (
+                      tx.id.toLowerCase().includes(q) ||
+                      (tx.userFullName && tx.userFullName.toLowerCase().includes(q)) ||
+                      (tx.phone && tx.phone.includes(q)) ||
+                      tx.amount.toString().includes(q)
+                    );
+                  })
+                  .map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-emerald-50/30 text-xs transition-colors"
+                    >
+                      <div className="space-y-1 text-left">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono font-bold text-sm text-emerald-800">
+                            {formatCurrency(tx.amount, tx.currency || currentAgent.currency || 'EGP')}
+                          </span>
+                          <span className="font-mono text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                            {tx.id}
+                          </span>
+                          <StatusBadge status={tx.status} />
+                          <OrderElapsedTimeBadge
+                            createdAt={tx.createdAt}
+                            processedAt={tx.processedAt}
+                            processingDurationSeconds={tx.processingDurationSeconds}
+                            processingDurationFormatted={tx.processingDurationFormatted}
+                            status={tx.status}
+                          />
+                        </div>
+                        <div className="text-slate-700 font-mono text-[11px] flex flex-wrap items-center gap-2">
+                          <span>Client: <strong className="text-slate-900">{tx.userFullName}</strong> ({tx.phone || tx.userInfo})</span>
+                          <span>•</span>
+                          <span>Gateway: {tx.provider}</span>
+                        </div>
                       </div>
-                      <div className="text-slate-600 font-mono text-[11px]">
-                        {tx.userFullName} ({tx.phone || '-'})
-                      </div>
-                    </div>
 
-                    <div className="text-left sm:text-right font-mono text-[11px] text-slate-400">
-                      <div>{tx.dateOfCreation || 'Cairo'}</div>
-                      <div>{tx.provider}</div>
+                      <div className="text-left sm:text-right font-mono text-[11px] space-y-0.5 shrink-0">
+                        <div className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          +Earned: {formatCurrency((tx.amount * depCommPercent) / 100, currentAgent.currency || 'EGP')} ({depCommPercent}%)
+                        </div>
+                        <div className="text-slate-400 text-[10px]">
+                          Processed: {tx.processedAt ? formatCairoTime(tx.processedAt) : tx.dateOfCreation}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Processed Withdrawals History (سجلات السحب المعالجة) */}
+        {activeTab === 'withdrawal_history' && (
+          <div className="p-3 sm:p-4 space-y-3">
+            <div className="relative">
+              <input
+                type="text"
+                value={historySearchQuery}
+                onChange={(e) => setHistorySearchQuery(e.target.value)}
+                placeholder="Search processed withdrawals by Order ID, client phone, or amount..."
+                className="w-full h-10 pl-9 pr-3 border border-slate-300 rounded-lg text-xs bg-white text-slate-900 focus:ring-1 focus:ring-amber-600 outline-none"
+              />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            </div>
+
+            <div className="divide-y divide-slate-100 border border-amber-200/80 rounded-xl overflow-hidden bg-white">
+              {agentProcessedWithdrawals.filter((tx) => {
+                if (!historySearchQuery.trim()) return true;
+                const q = historySearchQuery.toLowerCase();
+                return (
+                  tx.id.toLowerCase().includes(q) ||
+                  (tx.userFullName && tx.userFullName.toLowerCase().includes(q)) ||
+                  (tx.phone && tx.phone.includes(q)) ||
+                  tx.amount.toString().includes(q)
+                );
+              }).length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  No processed withdrawal records found.
+                </div>
+              ) : (
+                agentProcessedWithdrawals
+                  .filter((tx) => {
+                    if (!historySearchQuery.trim()) return true;
+                    const q = historySearchQuery.toLowerCase();
+                    return (
+                      tx.id.toLowerCase().includes(q) ||
+                      (tx.userFullName && tx.userFullName.toLowerCase().includes(q)) ||
+                      (tx.phone && tx.phone.includes(q)) ||
+                      tx.amount.toString().includes(q)
+                    );
+                  })
+                  .map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-amber-50/30 text-xs transition-colors"
+                    >
+                      <div className="space-y-1 text-left">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono font-bold text-sm text-amber-800">
+                            {formatCurrency(tx.amount, tx.currency || currentAgent.currency || 'EGP')}
+                          </span>
+                          <span className="font-mono text-slate-500 font-semibold bg-amber-50 px-1.5 py-0.5 rounded text-[11px] border border-amber-200">
+                            {tx.id}
+                          </span>
+                          <StatusBadge status={tx.status} />
+                          <OrderElapsedTimeBadge
+                            createdAt={tx.createdAt}
+                            processedAt={tx.processedAt}
+                            processingDurationSeconds={tx.processingDurationSeconds}
+                            processingDurationFormatted={tx.processingDurationFormatted}
+                            status={tx.status}
+                          />
+                        </div>
+                        <div className="text-slate-700 font-mono text-[11px] flex flex-wrap items-center gap-2">
+                          <span>Recipient: <strong className="text-slate-900">{tx.userFullName}</strong> ({tx.phone || tx.userInfo})</span>
+                          <span>•</span>
+                          <span>Gateway: {tx.provider}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-left sm:text-right font-mono text-[11px] space-y-0.5 shrink-0">
+                        <div className="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          +Earned: {formatCurrency((tx.amount * wdlCommPercent) / 100, currentAgent.currency || 'EGP')} ({wdlCommPercent}%)
+                        </div>
+                        <div className="text-slate-400 text-[10px]">
+                          Processed: {tx.processedAt ? formatCairoTime(tx.processedAt) : tx.dateOfCreation}
+                        </div>
+                      </div>
+                    </div>
+                  ))
               )}
             </div>
           </div>
@@ -1177,6 +1412,12 @@ export const AgentPortalView: React.FC = () => {
                 <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
                   * You may adjust the amount if the client transferred a different figure so the exact credit is recorded.
                 </p>
+
+                {/* Profit Credit Notice */}
+                <div className="mt-2.5 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] flex items-center justify-between font-mono">
+                  <span>✨ Profit to be credited ({depCommPercent}%):</span>
+                  <span className="font-bold">+{formatCurrency((Number(depositApprovedAmount || 0) * depCommPercent) / 100, currentAgent.currency || 'EGP')}</span>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
@@ -1229,6 +1470,12 @@ export const AgentPortalView: React.FC = () => {
                 <span>Payable Amount:</span>
                 <span className="text-amber-800 font-bold text-sm">{formatCurrency(selectedWithdrawalForConfirm.amount, selectedWithdrawalForConfirm.currency)}</span>
               </div>
+            </div>
+
+            {/* Profit Credit Notice for Withdrawal */}
+            <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-[11px] flex items-center justify-between font-mono">
+              <span>✨ Profit to be credited ({wdlCommPercent}%):</span>
+              <span className="font-bold">+{formatCurrency((selectedWithdrawalForConfirm.amount * wdlCommPercent) / 100, currentAgent.currency || 'EGP')}</span>
             </div>
 
             <div className="p-2.5 bg-slate-50 rounded-xl text-[11px] text-slate-500 leading-relaxed">
