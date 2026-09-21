@@ -87,7 +87,7 @@ export const AgentManagementView: React.FC = () => {
 
   const totalInsurance = agents.reduce((acc, a) => acc + a.insuranceDeposit, 0);
   const totalProcessed = agents.reduce((acc, a) => acc + (a.processedOrdersCount || a.todayProcessedCount || 0), 0);
-  const totalVolume = agents.reduce((acc, a) => acc + (a.processedVolume || a.todayAssignedVolumeEGP || 0), 0);
+  const totalVolume = agents.reduce((acc, a) => acc + (a.processedVolume || a.todayAssignedVolumeUSDT || 0), 0);
   const totalAgentProfits = agents.reduce((acc, a) => acc + (a.profitBalance || 0), 0);
 
   const handleOpenAdd = () => {
@@ -205,8 +205,8 @@ export const AgentManagementView: React.FC = () => {
         speedMode,
         dailyOrdersMin: dailyMin,
         dailyOrdersMax: dailyMax,
-        dailyVolumeMinEGP: 1000,
-        dailyVolumeMaxEGP: dailyMoneyCap,
+        dailyVolumeMinUSDT: 1000,
+        dailyVolumeMaxUSDT: dailyMoneyCap,
         depositCommissionPercent: Number(depositCommission),
         withdrawalCommissionPercent: Number(withdrawalCommission),
         useTieredCommission,

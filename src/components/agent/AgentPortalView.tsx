@@ -436,7 +436,7 @@ export const AgentPortalView: React.FC = () => {
               </div>
             </div>
             <div className="text-sm sm:text-lg lg:text-xl font-bold font-mono text-slate-900 truncate tracking-tight">
-              {formatCurrency(currentAgent.todayAssignedVolumeEGP || currentAgent.processedVolume || 0, currentAgent.currency || 'EGP')}
+              {formatCurrency(currentAgent.todayAssignedVolumeUSDT || currentAgent.processedVolume || 0, currentAgent.currency || 'EGP')}
             </div>
           </div>
           <div className="text-[10px] sm:text-[11px] text-slate-500 mt-2 truncate">

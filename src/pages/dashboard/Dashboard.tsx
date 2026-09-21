@@ -11,7 +11,9 @@ import {
   RotateCcw,
   Power,
   Layers,
-  Sparkles
+  Sparkles,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import {
   AreaChart,
@@ -42,10 +44,11 @@ export const Dashboard: React.FC = () => {
     confirmWithdrawal,
     isProductionMode,
     setProductionMode,
-    resetSystemData,
     globalTrafficActive,
     toggleGlobalTraffic,
     setInspectingTransaction,
+    isRealtimeSyncPaused,
+    toggleRealtimeSync,
   } = useAppStore();
 
   const totalPendingDepositsAmount = pendingDeposits.reduce((acc, t) => acc + t.amount, 0);
@@ -107,19 +110,22 @@ export const Dashboard: React.FC = () => {
             <span>{isProductionMode ? 'Production: ACTIVE' : 'Staging / Sandbox'}</span>
           </button>
 
-          {/* Reset Simulated Counters */}
+          {/* Real-time WebSocket Sync Switch */}
           <button
-            onClick={() => {
-              if (window.confirm('Reset all simulated test orders back to default initial seed?')) {
-                resetSystemData();
-              }
-            }}
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-slate-300 transition-colors cursor-pointer shadow-2xs"
-            title="Reset simulated counter values"
+            onClick={toggleRealtimeSync}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer border ${
+              isRealtimeSyncPaused
+                ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-500 animate-pulse'
+                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+            }`}
+            title="Pause or Resume live WebSocket connection updates for server-side maintenance"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Zero Counters</span>
-            <span className="sm:hidden">Reset</span>
+            {isRealtimeSyncPaused ? (
+              <WifiOff className="w-3.5 h-3.5 text-white" />
+            ) : (
+              <Wifi className="w-3.5 h-3.5 text-indigo-600" />
+            )}
+            <span>{isRealtimeSyncPaused ? 'Real-time Sync: PAUSED' : 'Real-time Sync: LIVE'}</span>
           </button>
 
           {/* Global Traffic Switch */}
@@ -154,7 +160,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="text-sm sm:text-lg lg:text-xl font-bold font-mono text-[#8B1E2D] truncate tracking-tight">
-              {formatCurrency(totalPendingDepositsAmount, 'EGP')}
+              {formatCurrency(totalPendingDepositsAmount, 'USDT')}
             </div>
           </div>
           <div className="text-[10px] sm:text-[11px] text-slate-500 mt-2 flex items-center gap-1 truncate">
@@ -178,7 +184,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="text-sm sm:text-lg lg:text-xl font-bold font-mono text-slate-900 truncate tracking-tight">
-              {formatCurrency(totalPendingWithdrawalsAmount, 'EGP')}
+              {formatCurrency(totalPendingWithdrawalsAmount, 'USDT')}
             </div>
           </div>
           <div className="text-[10px] sm:text-[11px] text-slate-500 mt-2 flex items-center gap-1 truncate">
@@ -243,7 +249,7 @@ export const Dashboard: React.FC = () => {
               <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider font-mono">
                 Intraday Cairo Settlement Curve
               </h2>
-              <span className="text-[11px] text-slate-500">Inbound Deposits vs. Dispatched Payouts (EGP)</span>
+              <span className="text-[11px] text-slate-500">Inbound Deposits vs. Dispatched Payouts (USDT)</span>
             </div>
             <span className="text-[11px] font-mono text-slate-400 px-2 py-0.5 rounded bg-slate-100">
               Today
@@ -267,7 +273,7 @@ export const Dashboard: React.FC = () => {
                 <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748B' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#64748B' }} />
                 <Tooltip
-                  formatter={(val: any) => formatCurrency(Number(val), 'EGP')}
+                  formatter={(val: any) => formatCurrency(Number(val), 'USDT')}
                   contentStyle={{
                     backgroundColor: '#0F172A',
                     borderColor: '#334155',

@@ -314,13 +314,13 @@ export const BotEngineView: React.FC = () => {
                         <input
                           type="number"
                           step="1000"
-                          value={agent.dailyVolumeMaxEGP || agent.dailyOrderLimit?.dailyMoneyCap || 40000}
+                          value={agent.dailyVolumeMaxUSDT || agent.dailyOrderLimit?.dailyMoneyCap || 40000}
                           onChange={(e) =>
-                            updateAgent(agent.id, { dailyVolumeMaxEGP: Number(e.target.value) })
+                            updateAgent(agent.id, { dailyVolumeMaxUSDT: Number(e.target.value) })
                           }
                           className="w-20 h-6 px-1 border border-slate-300 rounded font-mono text-xs text-[#8B1E2D] font-bold"
                         />
-                        <span className="text-[10px] text-slate-500">EGP</span>
+                        <span className="text-[10px] text-slate-500">USDT</span>
                       </div>
                     </td>
 
@@ -344,7 +344,7 @@ export const BotEngineView: React.FC = () => {
                         {agent.todayAssignedOrders || agent.processedOrdersCount || 0} orders
                       </div>
                       <div className="text-[10px] text-slate-500">
-                        {formatCurrency(agent.todayAssignedVolumeEGP || agent.processedVolume || 0, 'EGP')}
+                        {formatCurrency(agent.todayAssignedVolumeUSDT || agent.processedVolume || 0, 'USDT')}
                       </div>
                     </td>
 

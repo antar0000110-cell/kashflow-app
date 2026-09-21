@@ -137,7 +137,7 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
             ? {
                 ...a,
                 todayAssignedOrders: (a.todayAssignedOrders || a.processedOrdersCount || 0) + 1,
-                todayAssignedVolumeEGP: (a.todayAssignedVolumeEGP || a.processedVolume || 0) + Number(amount),
+                todayAssignedVolumeUSDT: (a.todayAssignedVolumeUSDT || a.processedVolume || 0) + Number(amount),
                 lastActiveAt: new Date().toISOString(),
               }
             : a

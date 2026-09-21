@@ -113,12 +113,12 @@ export interface Agent {
   speedMode: 'low' | 'medium' | 'fast';
   dailyOrdersMin: number;
   dailyOrdersMax: number;
-  dailyVolumeMinEGP: number;
-  dailyVolumeMaxEGP: number;
+  dailyVolumeMinUSDT: number;
+  dailyVolumeMaxUSDT: number;
   todayProcessedCount: number;
   processedOrdersCount?: number;
   todayAssignedOrders: number;
-  todayAssignedVolumeEGP: number;
+  todayAssignedVolumeUSDT: number;
   processedVolume?: number;
   depositPaymentMethod: string;
   depositMethod?: string;

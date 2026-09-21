@@ -92,8 +92,8 @@ export const FinancialReportsView: React.FC = () => {
 
       // Period simulated scaling if needed
       const periodMultiplier = reportPeriod === 'daily' ? 1 : reportPeriod === 'weekly' ? 7 : 30;
-      const scaledDepositVol = depositVolume > 0 ? depositVolume * periodMultiplier : (agent.todayAssignedVolumeEGP || 25000) * periodMultiplier;
-      const scaledWithdrawVol = withdrawalVolume > 0 ? withdrawalVolume * periodMultiplier : Math.round((agent.todayAssignedVolumeEGP || 25000) * 0.4) * periodMultiplier;
+      const scaledDepositVol = depositVolume > 0 ? depositVolume * periodMultiplier : (agent.todayAssignedVolumeUSDT || 25000) * periodMultiplier;
+      const scaledWithdrawVol = withdrawalVolume > 0 ? withdrawalVolume * periodMultiplier : Math.round((agent.todayAssignedVolumeUSDT || 25000) * 0.4) * periodMultiplier;
       const scaledTotalVol = scaledDepositVol + scaledWithdrawVol;
       const scaledCommission = (scaledDepositVol * depositCommissionRate) / 100 + (scaledWithdrawVol * withdrawalCommissionRate) / 100;
       const scaledDue = Math.max(0, scaledCommission - settledPayouts);

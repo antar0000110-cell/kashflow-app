@@ -380,10 +380,10 @@ export const TrafficDistributionMonitor: React.FC<TrafficDistributionMonitorProp
 
                       <td className="px-3 py-2.5">
                         <div className="font-mono font-bold text-slate-900">
-                          {formatCurrency(m.assignedVolumeEGP, 'EGP')}
+                          {formatCurrency(m.assignedVolumeUSDT, 'USDT')}
                         </div>
                         <span className="text-[10px] text-slate-400 block">
-                          Cap: {formatCurrency(m.dailyMoneyCap, 'EGP')}
+                          Cap: {formatCurrency(m.dailyMoneyCap, 'USDT')}
                         </span>
                       </td>
 

@@ -4,7 +4,7 @@ export interface AgentQueueMetrics {
   agentId: string;
   agentName: string;
   assignedTransactionsCount: number;
-  assignedVolumeEGP: number;
+  assignedVolumeUSDT: number;
   capacityUtilizationPercent: number;
   pendingDepositsCount: number;
   pendingWithdrawalsCount: number;
@@ -44,7 +44,7 @@ export interface TrafficImbalanceReport {
   timestamp: string;
   totalActiveAgents: number;
   totalAssignedOrders: number;
-  totalAssignedVolumeEGP: number;
+  totalAssignedVolumeUSDT: number;
   averageOrdersPerAgent: number;
   averageVolumePerAgent: number;
   imbalanceScore: number; // 0 (perfect balance) to 100 (extreme skew)
@@ -105,7 +105,7 @@ export class RouteAssignmentService {
       queueStatus = 'below_threshold';
     } else if (
       agent.todayAssignedOrders >= agent.dailyOrdersMax ||
-      agent.todayAssignedVolumeEGP >= (agent.dailyVolumeMaxEGP || agent.dailyOrderLimit?.dailyMoneyCap || 500000)
+      agent.todayAssignedVolumeUSDT >= (agent.dailyVolumeMaxUSDT || agent.dailyOrderLimit?.dailyMoneyCap || 500000)
     ) {
       queueStatus = 'quota_exhausted';
     }
@@ -160,11 +160,11 @@ export class RouteAssignmentService {
           speedMode: 'medium',
           dailyOrdersMin: 5,
           dailyOrdersMax: 50,
-          dailyVolumeMinEGP: 1000,
-          dailyVolumeMaxEGP: 100000,
+          dailyVolumeMinUSDT: 1000,
+          dailyVolumeMaxUSDT: 100000,
           todayProcessedCount: 0,
           todayAssignedOrders: 0,
-          todayAssignedVolumeEGP: 0,
+          todayAssignedVolumeUSDT: 0,
           depositPaymentMethod: 'Vodafone Cash',
           depositPaymentAddress: '',
           assignedWalletCount: 0,
@@ -241,7 +241,7 @@ export class RouteAssignmentService {
     if (agent.currentBalance < agent.trafficThreshold) {
       return {
         isEligible: false,
-        reason: `Balance (${agent.currentBalance} EGP) is below traffic threshold (${agent.trafficThreshold} EGP)`,
+        reason: `Balance (${agent.currentBalance} USDT) is below traffic threshold (${agent.trafficThreshold} USDT)`,
       };
     }
     if (agent.todayAssignedOrders >= agent.dailyOrdersMax) {
@@ -250,11 +250,11 @@ export class RouteAssignmentService {
         reason: `Daily order quota reached (${agent.todayAssignedOrders}/${agent.dailyOrdersMax})`,
       };
     }
-    const maxVolume = agent.dailyVolumeMaxEGP || agent.dailyOrderLimit?.dailyMoneyCap || 500000;
-    if (agent.todayAssignedVolumeEGP + amount > maxVolume) {
+    const maxVolume = agent.dailyVolumeMaxUSDT || agent.dailyOrderLimit?.dailyMoneyCap || 500000;
+    if (agent.todayAssignedVolumeUSDT + amount > maxVolume) {
       return {
         isEligible: false,
-        reason: `Daily volume cap exceeded (${agent.todayAssignedVolumeEGP + amount} > ${maxVolume} EGP)`,
+        reason: `Daily volume cap exceeded (${agent.todayAssignedVolumeUSDT + amount} > ${maxVolume} USDT)`,
       };
     }
 
@@ -263,7 +263,7 @@ export class RouteAssignmentService {
 
   /**
    * Selects the optimal agent using metadata-driven priority routing:
-   * 1. Evaluates agent assignment metadata (speedMode, dailyOrdersMax, dailyVolumeMaxEGP, providers, ratios)
+   * 1. Evaluates agent assignment metadata (speedMode, dailyOrdersMax, dailyVolumeMaxUSDT, providers, ratios)
    * 2. Evaluates wallet and provider compatibility
    * 3. Uses least-loaded queue scoring with speed mode multipliers
    */
@@ -273,7 +273,7 @@ export class RouteAssignmentService {
     provider: string,
     eligibleAgents: Agent[],
     wallets: Wallet[],
-    currency: string = 'EGP'
+    currency: string = 'USDT'
   ): RouteSelectionResult {
     if (!eligibleAgents || eligibleAgents.length === 0) {
       return { agent: null, matchedWallet: null, reason: 'No eligible agents online', score: 999, candidateCount: 0 };
@@ -282,7 +282,7 @@ export class RouteAssignmentService {
     // Filter agents passing eligibility criteria
     const verifiedCandidates = eligibleAgents.filter((a) => {
       const evaluation = this.evaluateAgentEligibility(a, amount);
-      const currencyMatch = !a.currency || a.currency === currency || a.currency === 'EGP';
+      const currencyMatch = !a.currency || a.currency === currency || a.currency === 'USDT';
       return evaluation.isEligible && currencyMatch;
     });
 
@@ -302,10 +302,10 @@ export class RouteAssignmentService {
         agent.depositMethod === provider;
 
       const maxOrders = agent.dailyOrdersMax || 50;
-      const maxVolume = agent.dailyVolumeMaxEGP || agent.dailyOrderLimit?.dailyMoneyCap || 100000;
+      const maxVolume = agent.dailyVolumeMaxUSDT || agent.dailyOrderLimit?.dailyMoneyCap || 100000;
       
       const orderRatio = (agent.todayAssignedOrders || 0) / Math.max(1, maxOrders);
-      const volumeRatio = (agent.todayAssignedVolumeEGP || 0) / Math.max(1, maxVolume);
+      const volumeRatio = (agent.todayAssignedVolumeUSDT || 0) / Math.max(1, maxVolume);
       const queueDepth = binding.queue.length;
 
       // Base Workload Score (Lower = higher priority)
@@ -394,7 +394,7 @@ export class RouteAssignmentService {
       const assignedCount =
         (agent.todayAssignedOrders || 0) + agentPendingDeps.length + agentPendingWdls.length;
       const assignedVolume =
-        (agent.todayAssignedVolumeEGP || 0) +
+        (agent.todayAssignedVolumeUSDT || 0) +
         agentPendingDeps.reduce((sum, t) => sum + t.amount, 0) +
         agentPendingWdls.reduce((sum, t) => sum + t.amount, 0);
 
@@ -417,14 +417,14 @@ export class RouteAssignmentService {
         agentId: agent.id,
         agentName: agent.name,
         assignedTransactionsCount: assignedCount,
-        assignedVolumeEGP: assignedVolume,
+        assignedVolumeUSDT: assignedVolume,
         capacityUtilizationPercent: capacityPercent,
         pendingDepositsCount: agentPendingDeps.length,
         pendingWithdrawalsCount: agentPendingWdls.length,
         isTrafficActive: agent.trafficActive !== false,
         insuranceCollateral: agent.insuranceDeposit || 0,
         dailyOrdersMax: maxOrders,
-        dailyMoneyCap: agent.dailyVolumeMaxEGP || agent.dailyOrderLimit?.dailyMoneyCap || 100000,
+        dailyMoneyCap: agent.dailyVolumeMaxUSDT || agent.dailyOrderLimit?.dailyMoneyCap || 100000,
         balanceUtilization: agent.insuranceDeposit ? (assignedVolume / agent.insuranceDeposit) * 100 : 0,
         speedMode: agent.speedMode || 'medium',
         supportedProviders,
@@ -434,7 +434,7 @@ export class RouteAssignmentService {
 
     const activeCount = agents.filter((a) => a.trafficActive !== false && a.status === 'active').length;
     const totalOrders = agentMetrics.reduce((sum, m) => sum + m.assignedTransactionsCount, 0);
-    const totalVolume = agentMetrics.reduce((sum, m) => sum + m.assignedVolumeEGP, 0);
+    const totalVolume = agentMetrics.reduce((sum, m) => sum + m.assignedVolumeUSDT, 0);
 
     const avgOrders = activeCount > 0 ? totalOrders / activeCount : 0;
     const avgVolume = activeCount > 0 ? totalVolume / activeCount : 0;
@@ -489,7 +489,7 @@ export class RouteAssignmentService {
       timestamp: new Date().toISOString(),
       totalActiveAgents: activeCount,
       totalAssignedOrders: totalOrders,
-      totalAssignedVolumeEGP: totalVolume,
+      totalAssignedVolumeUSDT: totalVolume,
       averageOrdersPerAgent: Math.round(avgOrders * 10) / 10,
       averageVolumePerAgent: Math.round(avgVolume),
       imbalanceScore,

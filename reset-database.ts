@@ -63,7 +63,7 @@ export function clearBrowserStorage(): void {
  */
 export async function resetDatabase(): Promise<void> {
   console.log('============================================================');
-  console.log('    KASHFLOW FINANCIAL OS - ZERO-DATA RESET UTILITY       ');
+  console.log('    UZX FINANCIAL OS - ZERO-DATA RESET UTILITY       ');
   console.log('============================================================');
 
   // 1. Purge local disk caches or json database files if present
@@ -81,7 +81,50 @@ export async function resetDatabase(): Promise<void> {
     }
   }
 
-  // 2. Clear browser storage if running in browser context
+  // 2. Load and reset the JSON persistent database file if it exists
+  const dbPath = path.join(process.cwd(), 'data', 'uzx_database.json');
+  if (fs.existsSync(dbPath)) {
+    try {
+      const raw = fs.readFileSync(dbPath, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.users)) {
+        // Retain ONLY admin users
+        data.users = data.users.filter((u: any) => u.role === 'admin');
+        data.agents = [];
+        data.wallets = [];
+        data.transactions = [];
+        data.agentDepositRequests = [];
+        data.agentPayouts = [];
+        data.notifications = [
+          {
+            id: `NOTIF-${Date.now()}`,
+            title: 'System Reset via Server CLI Utility',
+            message: 'All transaction history, wallets, agent accounts, and collateral profiles have been purged and zeroed out.',
+            timestamp: new Date().toISOString(),
+            type: 'system',
+            read: false
+          }
+        ];
+        data.botConfig = {
+          enabled: false,
+          frequencySeconds: 15,
+          minAmount: 100,
+          maxAmount: 5000,
+          targetAgentId: '',
+          targetProvider: 'Vodafone Cash'
+        };
+        data.lastUpdated = new Date().toISOString();
+        
+        fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf-8');
+        console.log('✅ Persistent JSON Database (uzx_database.json) successfully reset.');
+        console.log('   - Only admin users have been preserved.');
+      }
+    } catch (err) {
+      console.error('❌ Failed to read or parse uzx_database.json:', err);
+    }
+  }
+
+  // 3. Clear browser storage if running in browser context
   clearBrowserStorage();
 
   console.log('------------------------------------------------------------');
@@ -90,7 +133,7 @@ export async function resetDatabase(): Promise<void> {
   console.log('   - Pending & Historical Withdrawals: 0 records');
   console.log('   - Agent Accounts & Balances: 0 records');
   console.log('   - Wallet Pool Assignments: 0 records');
-  console.log('   - System Notifications: 0 records');
+  console.log('   - System Notifications: 1 system notice');
   console.log('============================================================');
 }
 

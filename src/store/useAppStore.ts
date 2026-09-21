@@ -164,7 +164,7 @@ export interface AppStoreState {
   toggleBankActive: (id: string) => void;
 
   // Actions - Agents & Traffic
-  addAgent: (agent: Omit<Agent, 'id' | 'todayProcessedCount' | 'todayAssignedOrders' | 'todayAssignedVolumeEGP' | 'assignedWalletCount' | 'assignedWalletIds' | 'lastActiveAt'>) => void;
+  addAgent: (agent: Omit<Agent, 'id' | 'todayProcessedCount' | 'todayAssignedOrders' | 'todayAssignedVolumeUSDT' | 'assignedWalletCount' | 'assignedWalletIds' | 'lastActiveAt'>) => void;
   updateAgent: (id: string, updates: Partial<Agent>) => void;
   toggleAgentTraffic: (id: string) => void;
   setGlobalTraffic: (active: boolean) => void;
@@ -234,11 +234,11 @@ const mapAgentsWithAliases = (rawAgents: Agent[]): Agent[] => {
     ...a,
     trafficEnabled: a.trafficEnabled !== undefined ? a.trafficEnabled : a.trafficActive,
     processedOrdersCount: a.processedOrdersCount !== undefined ? a.processedOrdersCount : a.todayProcessedCount,
-    processedVolume: a.processedVolume !== undefined ? a.processedVolume : a.todayAssignedVolumeEGP,
+    processedVolume: a.processedVolume !== undefined ? a.processedVolume : a.todayAssignedVolumeUSDT,
     dailyOrderLimit: a.dailyOrderLimit || {
       min: a.dailyOrdersMin || 10,
       max: a.dailyOrdersMax || 100,
-      dailyMoneyCap: a.dailyVolumeMaxEGP || 50000,
+      dailyMoneyCap: a.dailyVolumeMaxUSDT || 50000,
     },
     depositMethod: a.depositMethod || a.depositPaymentMethod,
     depositAddress: a.depositAddress || a.depositPaymentAddress,
@@ -588,6 +588,16 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     savePersistedData(STORAGE_KEYS.PERSISTED_AGENTS, emptyArray);
     savePersistedData(STORAGE_KEYS.PERSISTED_WALLETS, emptyArray);
 
+    // Call server API for persistent zero-data wipe
+    apiService.resetSystemData().then((ok) => {
+      if (ok) {
+        console.log('[Store Reset] Persistent zero-data reset completed successfully.');
+        get().syncWithBackend();
+      }
+    }).catch((e) => {
+      console.warn('[Store Reset] Failed to clear persistent storage, reset might be client-only:', e);
+    });
+
     set((state) => ({
       pendingDeposits: [],
       pendingWithdrawals: [],
@@ -695,14 +705,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           (targetAgentId && (a.id === targetAgentId || a.name === targetAgentId || a.username === targetAgentId)) ||
           (processedByRole === 'agent' && (a.name === processedBy || a.username === processedBy || a.id === processedBy));
         if (matches) {
-          let depositPercent = a.depositCommissionPercent !== undefined ? Number(a.depositCommissionPercent) : 3.0;
-          if (a.useTieredCommission && a.depositTiers && a.depositTiers.length > 0) {
-            const sortedTiers = [...a.depositTiers].sort((x, y) => x.minVolume - y.minVolume);
-            const matchedTier = sortedTiers.find((t) => finalAmount >= t.minVolume && (t.maxVolume === 0 || finalAmount <= t.maxVolume));
-            if (matchedTier) {
-              depositPercent = Number(matchedTier.ratePercent);
-            }
-          }
+          const depositPercent = a.depositCommissionPercent !== undefined ? Number(a.depositCommissionPercent) : 3.0;
           appliedRate = depositPercent;
           const depositProfit = Number(((finalAmount * depositPercent) / 100).toFixed(2));
           earnedDepositProfit = depositProfit;
@@ -710,7 +713,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
             ...a,
             todayProcessedCount: (a.todayProcessedCount || 0) + 1,
             processedOrdersCount: (a.processedOrdersCount || 0) + 1,
-            todayAssignedVolumeEGP: (a.todayAssignedVolumeEGP || 0) + finalAmount,
+            todayAssignedVolumeUSDT: (a.todayAssignedVolumeUSDT || 0) + finalAmount,
             processedVolume: (a.processedVolume || 0) + finalAmount,
             currentBalance: Number(((a.currentBalance || 0) + finalAmount).toFixed(2)),
             profitBalance: Number(((a.profitBalance || 0) + depositProfit).toFixed(2)),
@@ -874,14 +877,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           (targetAgentId && (a.id === targetAgentId || a.name === targetAgentId || a.username === targetAgentId)) ||
           (processedByRole === 'agent' && (a.name === processedBy || a.username === processedBy || a.id === processedBy));
         if (matches) {
-          let wdlPercent = a.withdrawalCommissionPercent !== undefined ? Number(a.withdrawalCommissionPercent) : 1.0;
-          if (a.useTieredCommission && a.withdrawalTiers && a.withdrawalTiers.length > 0) {
-            const sortedTiers = [...a.withdrawalTiers].sort((x, y) => x.minVolume - y.minVolume);
-            const matchedTier = sortedTiers.find((t) => tx.amount >= t.minVolume && (t.maxVolume === 0 || tx.amount <= t.maxVolume));
-            if (matchedTier) {
-              wdlPercent = Number(matchedTier.ratePercent);
-            }
-          }
+          const wdlPercent = a.withdrawalCommissionPercent !== undefined ? Number(a.withdrawalCommissionPercent) : 1.0;
           appliedRate = wdlPercent;
           const wdlProfit = Number(((tx.amount * wdlPercent) / 100).toFixed(2));
           earnedWithdrawalProfit = wdlProfit;
@@ -889,7 +885,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
             ...a,
             todayProcessedCount: (a.todayProcessedCount || 0) + 1,
             processedOrdersCount: (a.processedOrdersCount || 0) + 1,
-            todayAssignedVolumeEGP: (a.todayAssignedVolumeEGP || 0) + tx.amount,
+            todayAssignedVolumeUSDT: (a.todayAssignedVolumeUSDT || 0) + tx.amount,
             processedVolume: (a.processedVolume || 0) + tx.amount,
             currentBalance: Math.max(0, Number(((a.currentBalance || 0) - tx.amount).toFixed(2))),
             profitBalance: Number(((a.profitBalance || 0) + wdlProfit).toFixed(2)),
@@ -1143,7 +1139,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       totalEarnedCommission: 0,
       todayProcessedCount: 0,
       todayAssignedOrders: 0,
-      todayAssignedVolumeEGP: 0,
+      todayAssignedVolumeUSDT: 0,
       assignedWalletCount: 1,
       assignedWalletIds: [starterWalletId],
       lastActiveAt: new Date().toISOString(),
@@ -1757,7 +1753,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       if (a.status !== 'active' || !a.trafficActive) return false;
       if (a.currentBalance < a.trafficThreshold) return false;
       if (a.todayAssignedOrders >= a.dailyOrdersMax) return false;
-      if (a.todayAssignedVolumeEGP >= a.dailyVolumeMaxEGP) return false;
+      if (a.todayAssignedVolumeUSDT >= a.dailyVolumeMaxUSDT) return false;
       return true;
     });
 
@@ -1889,7 +1885,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           ? {
               ...a,
               todayAssignedOrders: a.todayAssignedOrders + 1,
-              todayAssignedVolumeEGP: a.todayAssignedVolumeEGP + amount,
+              todayAssignedVolumeUSDT: a.todayAssignedVolumeUSDT + amount,
               lastActiveAt: new Date().toISOString(),
             }
           : a
@@ -1951,7 +1947,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           ? {
               ...a,
               todayAssignedOrders: a.todayAssignedOrders + 1,
-              todayAssignedVolumeEGP: a.todayAssignedVolumeEGP + amount,
+              todayAssignedVolumeUSDT: a.todayAssignedVolumeUSDT + amount,
               lastActiveAt: new Date().toISOString(),
             }
           : a

@@ -71,7 +71,9 @@ class DatabaseEngine {
         const raw = fs.readFileSync(this.dbPath, 'utf-8');
         const parsed = JSON.parse(raw);
         console.log(`[Database] Loaded persistent data from ${this.dbPath}`);
-        return parsed;
+        const normalized = this.normalizeToUSDT(parsed);
+        this.saveImmediate(normalized);
+        return normalized;
       } catch (err) {
         console.error(`[Database] Error reading existing database file at ${this.dbPath}. Creating fresh state:`, err);
       }
@@ -146,24 +148,39 @@ class DatabaseEngine {
       }
     ];
 
-    const initialTransactions: Transaction[] = [
-      ...initialPendingDeposits,
-      ...initialPendingWithdrawals,
-      ...initialHistoricalTransactions
-    ];
+    const zeroBalanceAgents = initialAgents.map(a => ({
+      ...a,
+      insuranceDeposit: 0,
+      currentBalance: 0,
+      profitBalance: 0,
+      totalEarnedCommission: 0,
+      processedVolume: 0,
+      todayProcessedCount: 0,
+      processedOrdersCount: 0,
+      todayAssignedOrders: 0,
+      todayAssignedVolumeUSDT: 0
+    }));
+
+    const zeroBalanceWallets = initialWallets.map(w => ({
+      ...w,
+      balance: 0,
+      todaySent: 0,
+      todayReceived: 0,
+      monthTotal: 0
+    }));
 
     const initialDb: DatabaseSchema = {
       users: initialUsers,
-      agents: initialAgents,
-      wallets: initialWallets,
-      transactions: initialTransactions,
-      agentDepositRequests: initialAgentDepositRequests || [],
+      agents: zeroBalanceAgents,
+      wallets: zeroBalanceWallets,
+      transactions: [],
+      agentDepositRequests: [],
       agentPayouts: [],
       notifications: [
         {
           id: 'NOTIF-01',
           title: 'System Initialized',
-          message: 'UZX Enterprise Financial OS is running in secure production mode.',
+          message: 'UZX Enterprise Financial OS is running in secure production mode with a zero-balance state.',
           timestamp: new Date().toISOString(),
           type: 'system',
           read: false
@@ -182,7 +199,57 @@ class DatabaseEngine {
     };
 
     this.saveImmediate(initialDb);
-    return initialDb;
+    return this.normalizeToUSDT(initialDb);
+  }
+
+  private normalizeToUSDT(data: DatabaseSchema): DatabaseSchema {
+    if (data.agents) {
+      data.agents = data.agents.map((agent) => {
+        const updated = { ...agent } as any;
+        updated.currency = 'USDT';
+        if (agent.todayAssignedVolumeUSDT === undefined) {
+          updated.todayAssignedVolumeUSDT = (agent as any).todayAssignedVolumeEGP !== undefined 
+            ? (agent as any).todayAssignedVolumeEGP 
+            : ((agent as any).todayAssignedVolume || 0);
+        }
+        if (agent.dailyVolumeMinUSDT === undefined) {
+          updated.dailyVolumeMinUSDT = (agent as any).dailyVolumeMinEGP !== undefined 
+            ? (agent as any).dailyVolumeMinEGP 
+            : ((agent as any).dailyVolumeMin || 0);
+        }
+        if (agent.dailyVolumeMaxUSDT === undefined) {
+          updated.dailyVolumeMaxUSDT = (agent as any).dailyVolumeMaxEGP !== undefined 
+            ? (agent as any).dailyVolumeMaxEGP 
+            : ((agent as any).dailyVolumeMax || 50000);
+        }
+        
+        // Clean up legacy keys
+        delete updated.todayAssignedVolumeEGP;
+        delete updated.todayAssignedVolume;
+        delete updated.dailyVolumeMinEGP;
+        delete updated.dailyVolumeMin;
+        delete updated.dailyVolumeMaxEGP;
+        delete updated.dailyVolumeMax;
+        
+        return updated;
+      });
+    }
+
+    if (data.transactions) {
+      data.transactions = data.transactions.map((tx) => ({
+        ...tx,
+        currency: 'USDT'
+      }));
+    }
+
+    if (data.wallets) {
+      data.wallets = data.wallets.map((w) => ({
+        ...w,
+        currency: 'USDT'
+      }));
+    }
+
+    return data;
   }
 
   private saveImmediate(data: DatabaseSchema) {
@@ -359,6 +426,35 @@ class DatabaseEngine {
     };
     this.saveDebounced();
     return this.data.botConfig;
+  }
+
+  // Zero-data system reset (retaining admin users)
+  public resetToZeroData(): void {
+    this.data.users = this.data.users.filter((u) => u.role === 'admin');
+    this.data.agents = [];
+    this.data.wallets = [];
+    this.data.transactions = [];
+    this.data.agentDepositRequests = [];
+    this.data.agentPayouts = [];
+    this.data.notifications = [
+      {
+        id: `NOTIF-${Date.now()}`,
+        title: 'System Reset to Zero-Data State',
+        message: 'All transaction history, wallets, agent accounts, and collateral profiles have been purged and zeroed out.',
+        timestamp: new Date().toISOString(),
+        type: 'system',
+        read: false
+      }
+    ];
+    this.data.botConfig = {
+      enabled: false,
+      frequencySeconds: 15,
+      minAmount: 100,
+      maxAmount: 5000,
+      targetAgentId: '',
+      targetProvider: 'Vodafone Cash'
+    };
+    this.saveImmediate(this.data);
   }
 
   // Full snapshot sync

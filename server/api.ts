@@ -216,8 +216,8 @@ apiRouter.patch('/transactions/:id/status', requireAuth, (req: AuthenticatedRequ
     return;
   }
 
-  // If agent, verify they own the transaction
-  if (user.role === 'agent' && existingTx.subagentId !== user.agentId) {
+  // If agent, verify they own the transaction or it is an unassigned system broadcast
+  if (user.role === 'agent' && existingTx.subagentId && existingTx.subagentId !== user.agentId) {
     res.status(403).json({ success: false, message: 'Unauthorized to modify this transaction.' });
     return;
   }
@@ -259,14 +259,38 @@ apiRouter.patch('/transactions/:id/status', requireAuth, (req: AuthenticatedRequ
     timeOfProcessing: new Date().toLocaleTimeString('en-US', { hour12: false }),
   };
 
+  if (user.role === 'agent') {
+    updates.subagentId = user.agentId;
+    updates.subagentName = user.name;
+  }
+
   if (rejectionReason) {
     updates.rejectionReason = rejectionReason;
   }
 
   // If Approved, update agent balance, profit balance, and wallet totals
   if (status === 'Approved' && existingTx.status !== 'Approved') {
-    if (existingTx.subagentId) {
-      const agent = db.getAgentById(existingTx.subagentId);
+    let finalSubagentId = existingTx.subagentId || (user.role === 'agent' ? user.agentId : undefined);
+    if (!finalSubagentId) {
+      const walletId = existingTx.targetWalletId || existingTx.sourceWalletId;
+      if (walletId) {
+        const wallet = db.getWallets().find((w) => w.walletNumber === walletId || w.id === walletId);
+        if (wallet && (wallet.assignedAgentId || wallet.agentId)) {
+          finalSubagentId = wallet.assignedAgentId || wallet.agentId || undefined;
+        }
+      }
+    }
+
+    if (finalSubagentId && !updates.subagentId) {
+      updates.subagentId = finalSubagentId;
+      const targetAgent = db.getAgentById(finalSubagentId);
+      if (targetAgent) {
+        updates.subagentName = targetAgent.name;
+      }
+    }
+
+    if (finalSubagentId) {
+      const agent = db.getAgentById(finalSubagentId);
       if (agent) {
         const delta = existingTx.type === 'deposit' ? finalAmount : -finalAmount;
         const newBalance = Math.max(0, agent.currentBalance + delta);
@@ -290,7 +314,7 @@ apiRouter.patch('/transactions/:id/status', requireAuth, (req: AuthenticatedRequ
           totalEarnedCommission: newTotalEarned,
           todayProcessedCount: (agent.todayProcessedCount || 0) + 1,
           processedOrdersCount: (agent.processedOrdersCount || 0) + 1,
-          todayAssignedVolumeEGP: (agent.todayAssignedVolumeEGP || 0) + finalAmount,
+          todayAssignedVolumeUSDT: (agent.todayAssignedVolumeUSDT || 0) + finalAmount,
           processedVolume: (agent.processedVolume || 0) + finalAmount,
           lastActiveAt: new Date().toISOString()
         });
@@ -431,4 +455,11 @@ apiRouter.post('/notifications', requireAuth, (req: AuthenticatedRequest, res: R
     realtime.broadcast('notification:created', notif);
   }
   res.json({ success: true, notification: notif });
+});
+
+apiRouter.post('/admin/reset-system-data', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  res.status(403).json({
+    success: false,
+    message: 'Reset and database cleanup features are strictly disabled in the production environment for security reasons.'
+  });
 });

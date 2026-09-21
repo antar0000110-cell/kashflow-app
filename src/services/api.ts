@@ -131,6 +131,18 @@ class ApiService {
     }
   }
 
+  public async resetSystemDataOnServer(): Promise<boolean> {
+    try {
+      const res = await this.request('/api/admin/reset-system-data', {
+        method: 'POST',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('[API Client] Reset system data failed:', err);
+      return false;
+    }
+  }
+
   public async createTransaction(tx: any): Promise<any> {
     try {
       const res = await this.request('/api/transactions', {
@@ -242,6 +254,18 @@ class ApiService {
     } catch (err) {
       console.error('[API Client] Create notification failed:', err);
       return null;
+    }
+  }
+
+  public async resetSystemData(): Promise<boolean> {
+    try {
+      const res = await this.request('/api/admin/reset-system-data', {
+        method: 'POST',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('[API Client] Reset system data failed:', err);
+      return false;
     }
   }
 }
