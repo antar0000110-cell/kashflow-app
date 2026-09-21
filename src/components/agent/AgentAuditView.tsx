@@ -24,7 +24,7 @@ import { exportToCSV, exportToExcel } from '../../utils/exportUtils';
 import { OrderElapsedTimeBadge } from '../common/OrderElapsedTimeBadge';
 
 export const AgentAuditView: React.FC = () => {
-  const { agents, transactions, pendingDeposits, pendingWithdrawals, commissionRates } = useAppStore();
+  const { agents, depositHistory, withdrawalHistory, pendingDeposits, pendingWithdrawals, commissionRates } = useAppStore();
 
   const [selectedAgentFilter, setSelectedAgentFilter] = useState<string>('all');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
@@ -33,25 +33,27 @@ export const AgentAuditView: React.FC = () => {
   
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(50);
+  const [selectedAuditRecord, setSelectedAuditRecord] = useState<any | null>(null);
 
   // Combine processed & pending transactions for comprehensive audit
   const allAuditTransactions = useMemo(() => {
-    return [...transactions, ...pendingDeposits, ...pendingWithdrawals];
-  }, [transactions, pendingDeposits, pendingWithdrawals]);
+    return [...depositHistory, ...withdrawalHistory, ...pendingDeposits, ...pendingWithdrawals];
+  }, [depositHistory, withdrawalHistory, pendingDeposits, pendingWithdrawals]);
 
   // Compute audit records with rate validation
   const auditRecords = useMemo(() => {
     return allAuditTransactions.map((tx) => {
       // Find assigned agent
       const assignedAgent = agents.find(
-        (a) => a.id === tx.subagentId || a.id === tx.agentId || a.name === tx.agentName
+        (a) => a.id === tx.subagentId || a.name === tx.subagentName
       );
 
       // Determine configured commission rates for this agent
-      const configuredDepositRate = assignedAgent?.depositCommissionPercent ?? commissionRates.depositRate ?? 1.5;
-      const configuredWithdrawalRate = assignedAgent?.withdrawalCommissionPercent ?? commissionRates.withdrawalRate ?? 1.0;
+      const configuredDepositRate = assignedAgent?.depositCommissionPercent ?? commissionRates.depositCommissionPercent ?? 3.0;
+      const configuredWithdrawalRate = assignedAgent?.withdrawalCommissionPercent ?? commissionRates.withdrawalCommissionPercent ?? 1.0;
 
-      const appliedRatePercent = tx.type === 'Deposit' ? configuredDepositRate : configuredWithdrawalRate;
+      const isDeposit = tx.type === 'deposit' || (tx.type as string) === 'Deposit';
+      const appliedRatePercent = isDeposit ? configuredDepositRate : configuredWithdrawalRate;
       const calculatedCommission = (tx.amount * appliedRatePercent) / 100;
       
       const recordedCommission = tx.commissionEarned !== undefined ? tx.commissionEarned : calculatedCommission;
@@ -60,7 +62,7 @@ export const AgentAuditView: React.FC = () => {
       return {
         ...tx,
         assignedAgent,
-        agentNameDisplay: assignedAgent?.name || tx.agentName || 'Unassigned',
+        agentNameDisplay: assignedAgent?.name || tx.subagentName || 'Unassigned',
         appliedRatePercent,
         calculatedCommission,
         recordedCommission,
@@ -86,7 +88,7 @@ export const AgentAuditView: React.FC = () => {
         const matchId = rec.id.toLowerCase().includes(q);
         const matchUser = rec.userId?.toLowerCase().includes(q) || rec.userInfo?.toLowerCase().includes(q);
         const matchAgent = rec.agentNameDisplay.toLowerCase().includes(q);
-        const matchRef = rec.referenceNumber?.toLowerCase().includes(q);
+        const matchRef = ((rec as any).paymentRef || rec.id)?.toLowerCase().includes(q);
         if (!matchId && !matchUser && !matchAgent && !matchRef) return false;
       }
       return true;
@@ -266,6 +268,43 @@ export const AgentAuditView: React.FC = () => {
         </div>
       </div>
 
+      {/* Discrepancy Indicator Banner */}
+      {summaryMetrics.totalRecords - summaryMetrics.verifiedMatchesCount > 0 ? (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg p-3.5 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-rose-900">Commission Rate Discrepancy Detected</div>
+              <div className="text-[11px] text-rose-700">
+                {summaryMetrics.totalRecords - summaryMetrics.verifiedMatchesCount} transaction(s) differ from configured agent commission rates. Review highlighted records.
+              </div>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 bg-rose-100 text-rose-800 font-mono text-xs font-bold rounded">
+            {summaryMetrics.totalRecords - summaryMetrics.verifiedMatchesCount} Issues
+          </span>
+        </div>
+      ) : (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3.5 flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-emerald-900">100% Commission Audit Verification Passed</div>
+              <div className="text-[11px] text-emerald-700">
+                All transaction commission calculations match the active agent settings and ledger records. Click any row to inspect exact math.
+              </div>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-mono text-xs font-bold rounded">
+            All Verified
+          </span>
+        </div>
+      )}
+
       {/* Filters Bar */}
       <div className="bg-white p-3 sm:p-4 rounded-lg border border-slate-200 shadow-2xs space-y-3">
         <div className="flex items-center justify-between">
@@ -360,21 +399,26 @@ export const AgentAuditView: React.FC = () => {
                 </tr>
               ) : (
                 paginatedRecords.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr
+                    key={r.id}
+                    onClick={() => setSelectedAuditRecord(r)}
+                    className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                    title="Click to inspect real-time commission calculation math"
+                  >
                     <td className="p-3 font-mono font-bold text-blue-900">
                       {r.id}
                     </td>
                     <td className="p-3">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                        r.type === 'Deposit' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        r.type === 'deposit' || (r.type as string) === 'Deposit' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                       }`}>
-                        {r.type === 'Deposit' ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
+                        {r.type === 'deposit' || (r.type as string) === 'Deposit' ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
                         {r.type}
                       </span>
                     </td>
                     <td className="p-3">
                       <div className="font-bold text-slate-900">{r.agentNameDisplay}</div>
-                      <div className="text-[10px] text-slate-500">{r.subagentId || r.agentId || 'Standard'}</div>
+                      <div className="text-[10px] text-slate-500">{r.subagentId || 'Standard'}</div>
                     </td>
                     <td className="p-3 font-mono font-bold text-slate-900">
                       {formatCurrency(r.amount, r.currency || 'EGP')}
@@ -423,7 +467,6 @@ export const AgentAuditView: React.FC = () => {
         <div className="p-3 border-t border-slate-200 bg-slate-50">
           <PaginationBar
             currentPage={currentPage}
-            totalPages={Math.ceil(filteredRecords.length / pageSize) || 1}
             pageSize={pageSize}
             totalItems={filteredRecords.length}
             onPageChange={setCurrentPage}
@@ -431,6 +474,97 @@ export const AgentAuditView: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Commission Math Verification Overlay Modal */}
+      {selectedAuditRecord && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-purple-400" />
+                <h3 className="font-bold text-sm">Real-Time Commission Verification Math</h3>
+              </div>
+              <button
+                onClick={() => setSelectedAuditRecord(null)}
+                className="text-slate-400 hover:text-white text-sm font-bold px-2 py-1 rounded"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+                <div className="flex justify-between font-mono text-slate-600">
+                  <span>Transaction ID:</span>
+                  <span className="font-bold text-slate-900">{selectedAuditRecord.id}</span>
+                </div>
+                <div className="flex justify-between font-mono text-slate-600">
+                  <span>Transaction Type:</span>
+                  <span className="font-bold uppercase text-slate-900">{selectedAuditRecord.type}</span>
+                </div>
+                <div className="flex justify-between font-mono text-slate-600">
+                  <span>Transaction Amount:</span>
+                  <span className="font-bold text-slate-900">{formatCurrency(selectedAuditRecord.amount, selectedAuditRecord.currency || 'EGP')}</span>
+                </div>
+                <div className="flex justify-between font-mono text-slate-600">
+                  <span>Assigned Subagent:</span>
+                  <span className="font-bold text-slate-900">{selectedAuditRecord.agentNameDisplay}</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg bg-purple-50 border border-purple-200 space-y-2">
+                <div className="font-bold text-purple-900 text-sm flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-purple-700" />
+                  <span>Exact Mathematical Formula</span>
+                </div>
+                <div className="p-3 bg-white rounded border border-purple-100 font-mono text-center text-slate-800 text-sm">
+                  {selectedAuditRecord.amount.toLocaleString()} {selectedAuditRecord.currency || 'EGP'} × {selectedAuditRecord.appliedRatePercent}% = <span className="text-purple-700 font-bold">{selectedAuditRecord.calculatedCommission.toFixed(2)}</span>
+                </div>
+                <p className="text-[11px] text-purple-800 leading-relaxed">
+                  Formula breakdown: Transaction Volume multiplied by active agent commission percentage divided by 100.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="text-[10px] uppercase font-bold text-slate-500">Calculated DB Commission</div>
+                  <div className="text-base font-black font-mono text-purple-800 mt-1">
+                    {formatCurrency(selectedAuditRecord.calculatedCommission, selectedAuditRecord.currency || 'EGP')}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <div className="text-[10px] uppercase font-bold text-slate-500">Recorded Ledger Earnings</div>
+                  <div className="text-base font-black font-mono text-emerald-800 mt-1">
+                    {formatCurrency(selectedAuditRecord.recordedCommission, selectedAuditRecord.currency || 'EGP')}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-between border-t border-slate-200">
+                <div>
+                  {selectedAuditRecord.isVerifiedMatch ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-emerald-100 text-emerald-800">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                      VERIFIED MATCH: Zero Discrepancy
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-bold bg-rose-100 text-rose-800">
+                      <AlertTriangle className="w-4 h-4 text-rose-700" />
+                      DISCREPANCY DETECTED: Rate Mismatch!
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSelectedAuditRecord(null)}
+                  className="px-4 py-2 bg-slate-900 text-white rounded font-bold hover:bg-slate-800 cursor-pointer"
+                >
+                  Close Overlay
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

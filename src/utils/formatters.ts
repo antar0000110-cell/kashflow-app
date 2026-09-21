@@ -1,4 +1,4 @@
-export function formatCurrency(amount: number, currency: string = 'EGP'): string {
+export function formatCurrency(amount: number, currency: string = 'USDT'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'decimal',
     minimumFractionDigits: 2,

@@ -106,6 +106,11 @@ export const AdminSidebar: React.FC = () => {
     };
   }, [isMobileDrawerOpen]);
 
+  // Strict role separation: Agents NEVER see or interact with the Admin Sidebar
+  if (authRole === 'agent') {
+    return null;
+  }
+
   const toggleSection = (title: string) => {
     setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
   };
@@ -193,7 +198,7 @@ export const AdminSidebar: React.FC = () => {
         },
         {
           id: 'mobile-wallet-apk',
-          label: 'Mobile Wallet Simulator (APK)',
+          label: 'Agent Wallet APK & Share Link',
           icon: <Smartphone className="w-3.5 h-3.5 text-rose-300" />,
         },
       ],
@@ -251,6 +256,11 @@ export const AdminSidebar: React.FC = () => {
           id: 'financial-reports',
           label: 'Agent Profit Excel Reports',
           icon: <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />,
+        },
+        {
+          id: 'agent-audit',
+          label: 'Real-Time Commission Audit',
+          icon: <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />,
         },
         {
           id: 'agent-payouts',
@@ -424,20 +434,6 @@ export const AdminSidebar: React.FC = () => {
               Support
             </span>
           )}
-        </button>
-
-        <button
-          onClick={() => handleNavClick('mobile-wallet-apk')}
-          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-            activeSection === 'mobile-wallet-apk'
-              ? 'bg-[#8B1E2D] text-white shadow-2xs font-semibold'
-              : 'text-slate-300 hover:bg-[#1E293B] hover:text-white'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <Smartphone className="w-4 h-4 text-rose-400" />
-            {!isCollapsed && <span>Mobile Wallet Terminal (Light)</span>}
-          </div>
         </button>
       </div>
 

@@ -70,7 +70,7 @@ export const AgentManagementView: React.FC = () => {
     { id: 'wt2', minVolume: 50001, maxVolume: 200000, ratePercent: 1.5 },
     { id: 'wt3', minVolume: 200001, maxVolume: 0, ratePercent: 2.0 },
   ]);
-  const [currency, setCurrency] = useState('EGP');
+  const [currency, setCurrency] = useState('USDT');
   const [depositMethod, setDepositMethod] = useState('Vodafone Cash');
   const [depositAddress, setDepositAddress] = useState('01031860138');
 

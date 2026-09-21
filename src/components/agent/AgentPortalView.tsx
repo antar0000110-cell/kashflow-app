@@ -211,7 +211,10 @@ export const AgentPortalView: React.FC = () => {
   const totalWithdrawalVolume = agentProcessedWithdrawals.reduce((acc, t) => acc + t.amount, 0);
   const depCommPercent = currentAgent.depositCommissionPercent !== undefined ? currentAgent.depositCommissionPercent : 3.0;
   const wdlCommPercent = currentAgent.withdrawalCommissionPercent !== undefined ? currentAgent.withdrawalCommissionPercent : 1.0;
-  const totalEarnedCommission = (totalDepositVolume * (depCommPercent / 100)) + (totalWithdrawalVolume * (wdlCommPercent / 100));
+  const totalEarnedCommission = currentAgent.totalEarnedCommission !== undefined
+    ? currentAgent.totalEarnedCommission
+    : [...agentProcessedDeposits, ...agentProcessedWithdrawals].reduce((acc, tx) => acc + (tx.commissionEarned || 0), 0) ||
+      ((totalDepositVolume * (depCommPercent / 100)) + (totalWithdrawalVolume * (wdlCommPercent / 100)));
 
   const allAgentHistory = [...agentProcessedDeposits, ...agentProcessedWithdrawals];
 

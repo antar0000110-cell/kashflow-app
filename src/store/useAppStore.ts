@@ -578,6 +578,16 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
 
   resetSystemData: () => {
     // Zeros all counters, resets transactions, agents, wallets, requests, and payouts to fresh clean zero-data state
+    const emptyArray: any[] = [];
+    savePersistedData(STORAGE_KEYS.PERSISTED_PENDING_DEPOSITS, emptyArray);
+    savePersistedData(STORAGE_KEYS.PERSISTED_DEPOSIT_HISTORY, emptyArray);
+    savePersistedData(STORAGE_KEYS.PERSISTED_PENDING_WITHDRAWALS, emptyArray);
+    savePersistedData(STORAGE_KEYS.PERSISTED_WITHDRAWAL_HISTORY, emptyArray);
+    savePersistedData(STORAGE_KEYS.PERSISTED_AGENT_DEPOSIT_REQUESTS, emptyArray);
+    savePersistedData(STORAGE_KEYS.PERSISTED_AGENT_PAYOUTS, emptyArray);
+    savePersistedData(STORAGE_KEYS.PERSISTED_AGENTS, emptyArray);
+    savePersistedData(STORAGE_KEYS.PERSISTED_WALLETS, emptyArray);
+
     set((state) => ({
       pendingDeposits: [],
       pendingWithdrawals: [],
@@ -591,13 +601,14 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         {
           id: `NOTIF-${Date.now()}`,
           title: 'System Initialized for Production',
-          message: 'All queues, logs, and simulated activity cleared. All counters reset to zero.',
+          message: 'All queues, logs, and simulated activity cleared. System reset to clean zero state.',
           timestamp: new Date().toISOString(),
           type: 'success',
           isRead: false,
         },
       ],
       inspectingTransaction: null,
+      globalTrafficActive: false,
       botConfig: {
         ...state.botConfig,
         isRunning: false,
@@ -667,19 +678,41 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     let earnedDepositProfit = 0;
     let appliedRate = 3.0;
 
-    if (tx.subagentId) {
+    // Identify target agent ID either from tx.subagentId or target wallet's assigned agent
+    let targetAgentId = tx.subagentId;
+    if (!targetAgentId && tx.targetWalletId) {
+      const tw = wallets.find(
+        (w) => w.walletNumber === tx.targetWalletId || w.id === tx.targetWalletId || w.phoneNumber === tx.targetWalletId
+      );
+      if (tw && (tw.assignedAgentId || tw.agentId)) {
+        targetAgentId = tw.assignedAgentId || tw.agentId || undefined;
+      }
+    }
+
+    if (targetAgentId || processedByRole === 'agent') {
       updatedAgents = agents.map((a) => {
-        if (a.id === tx.subagentId) {
-          const depositPercent = a.depositCommissionPercent !== undefined ? Number(a.depositCommissionPercent) : 3.0;
+        const matches =
+          (targetAgentId && (a.id === targetAgentId || a.name === targetAgentId || a.username === targetAgentId)) ||
+          (processedByRole === 'agent' && (a.name === processedBy || a.username === processedBy || a.id === processedBy));
+        if (matches) {
+          let depositPercent = a.depositCommissionPercent !== undefined ? Number(a.depositCommissionPercent) : 3.0;
+          if (a.useTieredCommission && a.depositTiers && a.depositTiers.length > 0) {
+            const sortedTiers = [...a.depositTiers].sort((x, y) => x.minVolume - y.minVolume);
+            const matchedTier = sortedTiers.find((t) => finalAmount >= t.minVolume && (t.maxVolume === 0 || finalAmount <= t.maxVolume));
+            if (matchedTier) {
+              depositPercent = Number(matchedTier.ratePercent);
+            }
+          }
           appliedRate = depositPercent;
           const depositProfit = Number(((finalAmount * depositPercent) / 100).toFixed(2));
           earnedDepositProfit = depositProfit;
           return {
             ...a,
-            todayProcessedCount: a.todayProcessedCount + 1,
+            todayProcessedCount: (a.todayProcessedCount || 0) + 1,
             processedOrdersCount: (a.processedOrdersCount || 0) + 1,
-            todayAssignedVolumeEGP: a.todayAssignedVolumeEGP + finalAmount,
+            todayAssignedVolumeEGP: (a.todayAssignedVolumeEGP || 0) + finalAmount,
             processedVolume: (a.processedVolume || 0) + finalAmount,
+            currentBalance: Number(((a.currentBalance || 0) + finalAmount).toFixed(2)),
             profitBalance: Number(((a.profitBalance || 0) + depositProfit).toFixed(2)),
             totalEarnedCommission: Number(((a.totalEarnedCommission || 0) + depositProfit).toFixed(2)),
             lastActiveAt: new Date().toISOString(),
@@ -825,19 +858,40 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     let earnedWithdrawalProfit = 0;
     let appliedRate = 1.0;
 
-    if (tx.subagentId) {
+    let targetAgentId = tx.subagentId;
+    if (!targetAgentId && tx.sourceWalletId) {
+      const sw = wallets.find(
+        (w) => w.walletNumber === tx.sourceWalletId || w.id === tx.sourceWalletId || w.phoneNumber === tx.sourceWalletId
+      );
+      if (sw && (sw.assignedAgentId || sw.agentId)) {
+        targetAgentId = sw.assignedAgentId || sw.agentId || undefined;
+      }
+    }
+
+    if (targetAgentId || processedByRole === 'agent') {
       updatedAgents = agents.map((a) => {
-        if (a.id === tx.subagentId) {
-          const wdlPercent = a.withdrawalCommissionPercent !== undefined ? Number(a.withdrawalCommissionPercent) : 1.0;
+        const matches =
+          (targetAgentId && (a.id === targetAgentId || a.name === targetAgentId || a.username === targetAgentId)) ||
+          (processedByRole === 'agent' && (a.name === processedBy || a.username === processedBy || a.id === processedBy));
+        if (matches) {
+          let wdlPercent = a.withdrawalCommissionPercent !== undefined ? Number(a.withdrawalCommissionPercent) : 1.0;
+          if (a.useTieredCommission && a.withdrawalTiers && a.withdrawalTiers.length > 0) {
+            const sortedTiers = [...a.withdrawalTiers].sort((x, y) => x.minVolume - y.minVolume);
+            const matchedTier = sortedTiers.find((t) => tx.amount >= t.minVolume && (t.maxVolume === 0 || tx.amount <= t.maxVolume));
+            if (matchedTier) {
+              wdlPercent = Number(matchedTier.ratePercent);
+            }
+          }
           appliedRate = wdlPercent;
           const wdlProfit = Number(((tx.amount * wdlPercent) / 100).toFixed(2));
           earnedWithdrawalProfit = wdlProfit;
           return {
             ...a,
-            todayProcessedCount: a.todayProcessedCount + 1,
+            todayProcessedCount: (a.todayProcessedCount || 0) + 1,
             processedOrdersCount: (a.processedOrdersCount || 0) + 1,
-            todayAssignedVolumeEGP: a.todayAssignedVolumeEGP + tx.amount,
+            todayAssignedVolumeEGP: (a.todayAssignedVolumeEGP || 0) + tx.amount,
             processedVolume: (a.processedVolume || 0) + tx.amount,
+            currentBalance: Math.max(0, Number(((a.currentBalance || 0) - tx.amount).toFixed(2))),
             profitBalance: Number(((a.profitBalance || 0) + wdlProfit).toFixed(2)),
             totalEarnedCommission: Number(((a.totalEarnedCommission || 0) + wdlProfit).toFixed(2)),
             lastActiveAt: new Date().toISOString(),
