@@ -182,10 +182,24 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
     return () => clearInterval(botTimer);
   }, [isSessionActive, authRole, botConfig.isEnabled, globalTrafficActive, botConfig.intervalSeconds, triggerBotOrder]);
 
+  // Dedicated Domain & URL Parameter Routing:
+  // 1. Root Domain (uzx.agency / "/") strictly opens the UZX Wallet (MobileApkWalletView) with APK download button.
+  // 2. Admin Portal is dedicated exclusively to "/admin" or "?portal=admin".
+  // 3. Agent Portal (Management OS) is dedicated to "?portal=agent" or "?app=agent" or "/agent".
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const isAdminPath = pathname.startsWith('/admin') || urlParams.get('portal') === 'admin' || urlParams.get('admin') === 'true';
+  const isAgentPath = pathname.startsWith('/agent') || urlParams.get('portal') === 'agent' || urlParams.get('app') === 'agent';
+
   // Native Capacitor Wrapper APK Detection:
   // If running inside Capacitor (compiled APK), strictly and exclusively show the MobileApkWalletView!
   const isNativeCapacitor = typeof window !== 'undefined' && (window as any).Capacitor !== undefined;
   if (isNativeCapacitor) {
+    return <MobileApkWalletView />;
+  }
+
+  // If user accesses root domain without admin/agent path and is not logged in as admin/agent, default directly to UZX Wallet!
+  if (!isAdminPath && !isAgentPath && authRole === 'guest') {
     return <MobileApkWalletView />;
   }
 

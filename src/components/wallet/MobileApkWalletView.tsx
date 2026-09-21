@@ -408,6 +408,16 @@ export const MobileApkWalletView: React.FC = () => {
                 </p>
               </div>
 
+              {/* Direct APK Download Button for UZX Wallet */}
+              <a
+                href="/downloads/uzx-wallet.apk"
+                download="uzx-wallet.apk"
+                className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-950/40 border border-emerald-400/30 transition-all cursor-pointer"
+              >
+                <Smartphone className="w-4 h-4 text-emerald-200" />
+                <span>Download UZX Wallet Android App (.APK)</span>
+              </a>
+
               {loginError && (
                 <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 text-left justify-start">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -463,6 +473,12 @@ export const MobileApkWalletView: React.FC = () => {
                     <span>Proceed &amp; Next</span>
                     <ChevronRight className="w-4 h-4" />
                   </button>
+
+                  <div className="pt-2 text-center">
+                    <a href="/?portal=admin" className="text-[10px] font-mono text-slate-500 hover:text-slate-300 transition-colors">
+                      [ Admin Operations Portal ]
+                    </a>
+                  </div>
                 </form>
               )}
 

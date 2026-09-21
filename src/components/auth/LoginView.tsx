@@ -5,8 +5,8 @@ import { StorageUtil, STORAGE_KEYS } from '../../utils/storage';
 
 export const LoginView: React.FC = () => {
   const { login } = useAppStore();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('agent1');
+  const [password, setPassword] = useState('agent123');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -59,7 +59,42 @@ export const LoginView: React.FC = () => {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="text-center">
             <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wide">System Access Authentication</h2>
-            <p className="text-xs text-slate-400 mt-1">Enter your assigned administrative or agent credentials</p>
+            <p className="text-xs text-slate-400 mt-1">Select portal role or enter credentials to access Management OS</p>
+          </div>
+
+          {/* Quick Portal Switcher Buttons */}
+          <div className="grid grid-cols-2 gap-2 p-1.5 bg-[#0F172A] rounded-xl border border-[#334155]/80">
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('agent1');
+                setPassword('agent123');
+              }}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${
+                username === 'agent1'
+                  ? 'bg-sky-600/30 text-sky-300 border-sky-500 shadow-sm shadow-sky-950/50'
+                  : 'bg-[#1E293B] text-slate-300 border-slate-700/60 hover:border-sky-500/50 hover:text-white'
+              }`}
+            >
+              <span className="text-[11px]">Management OS Agent</span>
+              <span className="text-[9px] font-mono text-sky-400/90 font-normal">agent1 / agent123</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('admin');
+                setPassword('admin123');
+              }}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${
+                username === 'admin'
+                  ? 'bg-rose-900/40 text-rose-300 border-rose-600 shadow-sm'
+                  : 'bg-[#1E293B] text-slate-300 border-slate-700/60 hover:border-rose-500/50 hover:text-white'
+              }`}
+            >
+              <span className="text-[11px]">Master Admin</span>
+              <span className="text-[9px] font-mono text-rose-400/90 font-normal">admin / admin123</span>
+            </button>
           </div>
 
           {error && (

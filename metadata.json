@@ -1,6 +1,8 @@
 {
-  "name": "UZX Wallet Financial OS",
-  "description": "Enterprise global fintech platform with real-time USDT transactions, TRC20 network nodes, automated wallet traffic engine, subagent quota routing, and light mobile wallet terminal.",
+  "name": "Management OS",
+  "description": "Management OS - Authorized Agent Operations & Real-Time Management Terminal",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

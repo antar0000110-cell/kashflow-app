@@ -1,7 +1,7 @@
 {
   "short_name": "Management OS",
-  "name": "Management OS & UZX Wallet System",
-  "description": "Enterprise Agent Operations Terminal & Fast Mobile Wallet Gateway",
+  "name": "Management OS - Agent Operations Terminal",
+  "description": "Authorized Agent Operations & Real-Time Management Terminal",
   "icons": [
     {
       "src": "/management-os-icon.jpg",
@@ -11,18 +11,6 @@
     },
     {
       "src": "/management-os-icon.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192 512x512",
-      "purpose": "any"
-    },
-    {
-      "src": "/uzx-wallet-icon.jpg",
-      "type": "image/jpeg",
-      "sizes": "512x512",
-      "purpose": "any"
-    },
-    {
-      "src": "/uzx-wallet-icon.svg",
       "type": "image/svg+xml",
       "sizes": "192x192 512x512",
       "purpose": "any"
