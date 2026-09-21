@@ -838,8 +838,6 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       processedAt: now.toISOString(),
     }).catch(() => {});
 
-    soundManager.playTransactionChime();
-
     addNotification({
       title: 'Deposit Order Confirmed',
       message: `Deposit of ${finalAmount} ${tx.currency} (Order ${tx.id}) approved by ${processedBy}. Profit: +${earnedDepositProfit} ${tx.currency}`,
@@ -1035,8 +1033,6 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       processingDurationFormatted: elapsedFormatted,
       processedAt: now.toISOString(),
     }).catch(() => {});
-
-    soundManager.playTransactionChime();
 
     addNotification({
       title: 'Withdrawal Confirmed',
@@ -1818,8 +1814,6 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       depositHistory: [newTx, ...depositHistory],
     });
 
-    soundManager.playTransactionChime();
-
     addNotification({
       title: 'تم التحويل بنجاح',
       message: `تم تحويل ${amount.toLocaleString()} USDT من المحفظة [${source.walletNumber}] إلى [${target.walletNumber}]. رقم العملية: ${txId}`,
@@ -2055,7 +2049,6 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       }));
 
       apiService.createTransaction(newDeposit).catch(() => {});
-      soundManager.playTransactionChime();
 
       if (isWrongWalletMismatch) {
         addNotification({
@@ -2065,6 +2058,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           targetSection: 'disputes',
           targetAgentId: agent.id,
           agentId: agent.id,
+          targetAudience: 'agent',
           orderId: newDeposit.id,
         });
       } else {
@@ -2075,6 +2069,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           targetSection: 'pending-deposits',
           targetAgentId: agent.id,
           agentId: agent.id,
+          targetAudience: 'agent',
           orderId: newDeposit.id,
         });
       }
@@ -2129,7 +2124,6 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       }));
 
       apiService.createTransaction(newWithdrawal).catch(() => {});
-      soundManager.playTransactionChime();
 
       addNotification({
         title: `Pending Withdrawal Order: ${amount} ${agent.currency || 'USDT'}`,
@@ -2138,6 +2132,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         targetSection: 'pending-withdrawals',
         targetAgentId: agent.id,
         agentId: agent.id,
+        targetAudience: 'agent',
         orderId: newWithdrawal.id,
       });
     }
@@ -2560,17 +2555,34 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       return;
     }
 
-    const currentUserId = state.currentUser.role === 'admin' ? 'admin' : (state.currentUser.agentId || 'guest');
-    const isAgent = state.currentUser.role === 'agent';
+    const role = state.currentUser.role || state.authRole;
+    const currentAgentId = state.currentUser.agentId || state.selectedAgentId;
+    const currentUserId = state.currentUser.agentId || state.currentUser.username;
     const targetAgent = notifData.targetAgentId || notifData.agentId;
+    const targetAudience = notifData.targetAudience;
 
-    // Filter out notifications not belonging to the currently logged in agent
-    if (isAgent && targetAgent && targetAgent !== state.currentUser.agentId) {
-      return;
+    // 1. Strict Filter for Agents (Management OS)
+    if (role === 'agent') {
+      if (targetAudience === 'user') {
+        return; // Agents don't receive user-wallet balance notifications
+      }
+      if (targetAgent && currentAgentId && targetAgent !== currentAgentId) {
+        return; // Drop notifications targeted to another agent
+      }
     }
 
-    // Fire socket transaction update specifically for this user's channel
-    socketService.triggerLocalScopedNotification(currentUserId, notifData);
+    // 2. Strict Filter for Wallet Users (UZX Wallet)
+    if ((role as string) === 'user') {
+      if (targetAudience === 'agent' || targetAudience === 'admin') {
+        return; // Wallet users don't receive agent order logs or admin alerts
+      }
+      if (notifData.targetUserId && currentUserId && notifData.targetUserId !== currentUserId) {
+        return; // Drop notifications targeted to another wallet user
+      }
+    }
+
+    // Fire socket notification event for this channel
+    socketService.triggerLocalScopedNotification(currentAgentId || currentUserId || 'admin', notifData);
 
     const newNotif: AppNotification = {
       id: `NOTIF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -2584,8 +2596,12 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     // Sync notification to backend API for persistence and cross-session delivery
     apiService.createNotification(newNotif).catch(() => {});
 
-    // Send native system push notification to Desktop / Mobile / PWA
-    sendNativePushNotification(notifData.title, notifData.message, notifData.type).catch(() => {});
+    // Send targeted native system push notification & chime to Desktop / Mobile / PWA
+    sendNativePushNotification(notifData.title, notifData.message, notifData.type, {
+      targetAgentId: targetAgent,
+      targetUserId: notifData.targetUserId,
+      targetAudience: targetAudience || (role === 'agent' ? 'agent' : 'all'),
+    }).catch(() => {});
   },
 
   markNotificationRead: (id) => {

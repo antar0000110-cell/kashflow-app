@@ -3,6 +3,7 @@
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { StorageUtil, STORAGE_KEYS } from '../utils/storage';
+import { soundManager } from '../utils/soundAlerts';
 
 export type DeviceType = 'desktop' | 'mobile_web' | 'mobile_app';
 
@@ -39,6 +40,8 @@ function getAudioContext(): AudioContext | null {
  */
 export function playSynthesizedChime(type: 'success' | 'alert' | 'cash' = 'cash'): void {
   try {
+    if (!soundManager.isEnabled()) return;
+
     const role = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
     if (!role || role === 'guest') return;
 
@@ -304,10 +307,10 @@ export async function requestNotificationPermission(): Promise<'granted' | 'deni
         
         setTimeout(() => {
           sendNativePushNotification(
-            '🔔 UZX Wallet Notifications Active',
-            'Instant real-time notifications for orders and commissions are now active.',
+            '🔔 Management OS Notifications Active',
+            'Instant real-time agent notifications for orders and commissions are now active.',
             'success',
-            { tag: 'welcome-notification' }
+            { tag: 'welcome-notification', targetAudience: 'agent' }
           );
         }, 400);
       }
@@ -347,10 +350,10 @@ export async function requestNotificationPermission(): Promise<'granted' | 'deni
       // Dispatch real Native System Push Notification
       setTimeout(() => {
         sendNativePushNotification(
-          '🔔 UZX Wallet Notifications Active',
-          'Instant real-time notifications for orders and commissions are now active.',
+          '🔔 Management OS Notifications Active',
+          'Instant real-time agent notifications for orders and commissions are now active.',
           'success',
-          { tag: 'welcome-notification' }
+          { tag: 'welcome-notification', targetAudience: 'agent' }
         );
       }, 400);
     }
@@ -374,6 +377,9 @@ export async function sendNativePushNotification(
     tag?: string;
     url?: string;
     requireInteraction?: boolean;
+    targetAgentId?: string;
+    targetUserId?: string;
+    targetAudience?: 'admin' | 'agent' | 'user' | 'all';
   }
 ): Promise<boolean> {
   const role = StorageUtil.get(STORAGE_KEYS.AUTH_ROLE);
@@ -381,7 +387,43 @@ export async function sendNativePushNotification(
     return false;
   }
 
-  // Always trigger audio chime and haptic if sound enabled
+  // Strict Scope Check for Agent Role
+  if (role === 'agent') {
+    if (options?.targetAudience === 'user') return false;
+    if (options?.targetAgentId) {
+      const storedAgentId = StorageUtil.get(STORAGE_KEYS.SELECTED_AGENT_ID);
+      let profileAgentId: string | null = null;
+      try {
+        const profileStr = StorageUtil.get(STORAGE_KEYS.USER_PROFILE);
+        const profile = profileStr ? JSON.parse(profileStr) : null;
+        profileAgentId = profile?.agentId || null;
+      } catch {}
+
+      const currentAgentId = storedAgentId || profileAgentId;
+      if (currentAgentId && options.targetAgentId !== currentAgentId) {
+        // Silently ignore notification not intended for this logged-in agent
+        return false;
+      }
+    }
+  }
+
+  // Strict Scope Check for User Role (Wallet)
+  if (role === 'user') {
+    if (options?.targetAudience === 'agent' || options?.targetAudience === 'admin') return false;
+    if (options?.targetUserId) {
+      let currentUserId: string | null = null;
+      try {
+        const profileStr = StorageUtil.get(STORAGE_KEYS.USER_PROFILE);
+        const profile = profileStr ? JSON.parse(profileStr) : null;
+        currentUserId = profile?.id || null;
+      } catch {}
+      if (currentUserId && options.targetUserId !== currentUserId) {
+        return false;
+      }
+    }
+  }
+
+  // Trigger audio chime and haptic if sound enabled and targeted
   playSynthesizedChime(type === 'danger' || type === 'warning' ? 'alert' : 'cash');
   triggerHaptic(type === 'danger' ? 'error' : 'medium');
 

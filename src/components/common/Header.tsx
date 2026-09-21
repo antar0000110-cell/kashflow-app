@@ -70,15 +70,10 @@ export const Header: React.FC = () => {
       const elapsedSec = Math.floor((Date.now() - lastPulseTime) / 1000);
       const remaining = Math.max(0, 90 - (elapsedSec % 90));
       setPulseCountdown(remaining);
-
-      // Auto-trigger 90-second pulse chime if enabled
-      if (remaining === 0 && elapsedSec > 5) {
-        trigger90sPulse();
-      }
     }, 1000);
 
     return () => clearInterval(clockInterval);
-  }, [lastPulseTime, trigger90sPulse]);
+  }, [lastPulseTime]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const totalPending = pendingDeposits.length + pendingWithdrawals.length;
@@ -108,21 +103,38 @@ export const Header: React.FC = () => {
             }}
             className={`flex items-center gap-2 sm:gap-2.5 select-none ${authRole === 'admin' ? 'cursor-pointer group' : 'cursor-default'}`}
           >
-            {/* Fintech Brand Emblem with Official UZX Wallet Logo */}
-            <img
-              src="/uzx-logo.png"
-              alt="UZX Wallet Logo"
-              className="w-8 h-8 rounded-lg object-contain shadow-sm shrink-0 bg-white/10 p-0.5"
-              referrerPolicy="no-referrer"
-            />
-            <div className="flex flex-col text-left">
-              <span className="font-extrabold tracking-widest text-xs sm:text-sm text-white flex items-center gap-1">
-                UZX <span className="text-rose-400 font-bold">{authRole === 'admin' ? 'OS' : 'AGENT'}</span>
-              </span>
-              <span className="text-[9px] text-slate-400 font-mono tracking-tight hidden sm:block">
-                {authRole === 'admin' ? 'GLOBAL REAL-TIME FINANCIAL OS' : 'AUTHORIZED AGENT TERMINAL'}
-              </span>
-            </div>
+            {authRole === 'agent' || authRole === 'admin' ? (
+              <>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-700 to-sky-500 border border-sky-400/40 flex items-center justify-center font-black text-xs text-white shadow-md shrink-0">
+                  OS
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="font-extrabold tracking-wider text-xs sm:text-sm text-white flex items-center gap-1.5">
+                    Management OS <span className="px-1.5 py-0.2 text-[9px] font-bold bg-sky-950 text-sky-300 border border-sky-700 rounded">{authRole === 'admin' ? 'ADMIN' : 'AGENT'}</span>
+                  </span>
+                  <span className="text-[9px] text-sky-300/80 font-mono tracking-tight hidden sm:block">
+                    {authRole === 'admin' ? 'GLOBAL REAL-TIME MANAGEMENT SYSTEM' : 'AUTHORIZED AGENT TERMINAL'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <img
+                  src="/uzx-logo.png"
+                  alt="UZX Wallet Logo"
+                  className="w-8 h-8 rounded-lg object-contain shadow-xs shrink-0 bg-white/10 p-0.5"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="flex flex-col text-left">
+                  <span className="font-extrabold tracking-widest text-xs sm:text-sm text-white flex items-center gap-1">
+                    UZX <span className="text-emerald-400 font-bold">WALLET</span>
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-mono tracking-tight hidden sm:block">
+                    OFFICIAL TRC20 ELECTRONIC WALLET
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

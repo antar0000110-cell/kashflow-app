@@ -230,6 +230,8 @@ export interface AppNotification {
   isRead: boolean;
   agentId?: string;
   targetAgentId?: string;
+  targetUserId?: string;
+  targetAudience?: 'admin' | 'agent' | 'user' | 'all';
   orderId?: string;
 }
 
