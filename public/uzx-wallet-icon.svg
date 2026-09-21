@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="crimsonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B1E2D"/>
+      <stop offset="100%" stop-color="#5B131E"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="bgGradUzx" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#182232"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Squircle -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgGradUzx)" stroke="#8B1E2D" stroke-width="8" />
+
+  <!-- Inner Crimson Emblem Box -->
+  <rect x="96" y="96" width="320" height="320" rx="72" fill="url(#crimsonGrad)" />
+
+  <!-- Bold UZX Text -->
+  <text x="256" y="275" font-family="'IBM Plex Sans', 'Segoe UI', sans-serif" font-weight="900" font-size="110" fill="#FFFFFF" text-anchor="middle" letter-spacing="2">UZX</text>
+
+  <!-- TRC20 Emerald Badge -->
+  <rect x="146" y="325" width="220" height="42" rx="21" fill="url(#emeraldGrad)" />
+  <text x="256" y="352" font-family="'IBM Plex Mono', monospace" font-weight="800" font-size="18" fill="#FFFFFF" text-anchor="middle" letter-spacing="2">USDT WALLET</text>
+</svg>

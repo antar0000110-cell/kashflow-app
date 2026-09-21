@@ -301,7 +301,7 @@ export const AgentPortalView: React.FC = () => {
       {/* Top Banner: Locked Strictly to Current Agent Profile (No Switcher Dropdown) */}
       <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-[#8B1E2D] text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-sky-700 to-sky-500 text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0">
             {currentAgent.name.charAt(0)}
           </div>
           <div className="min-w-0">

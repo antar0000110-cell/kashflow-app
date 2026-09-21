@@ -458,11 +458,16 @@ export async function sendNativePushNotification(
     return false;
   }
 
+  const isAgentApp = options?.targetAudience === 'agent' || title.includes('Management OS');
+  const appIcon = isAgentApp ? '/management-os-icon.jpg' : '/uzx-wallet-icon.jpg';
+  const appBadge = isAgentApp ? '/management-os-icon.svg' : '/uzx-wallet-icon.svg';
+  const defaultTag = isAgentApp ? `management-os-${Date.now()}` : `uzx-wallet-${Date.now()}`;
+
   const notificationOptions = {
     body,
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
-    tag: options?.tag || `uzx-${Date.now()}`,
+    icon: appIcon,
+    badge: appBadge,
+    tag: options?.tag || defaultTag,
     renotify: true,
     requireInteraction: options?.requireInteraction ?? (type === 'danger' || type === 'warning'),
     data: {

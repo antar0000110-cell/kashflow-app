@@ -37,26 +37,21 @@ export const LoginView: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#0F172A] flex flex-col justify-center items-center p-4 relative overflow-hidden select-none font-sans">
       {/* Subtle Background Glows */}
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-[#8B1E2D]/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-sky-600/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-slate-800/40 rounded-full blur-3xl pointer-events-none" />
 
       {/* Main Container */}
-      <div className="w-full max-w-md bg-[#1E293B] border border-[#334155] rounded-2xl shadow-2xl overflow-hidden relative z-10">
+      <div className="w-full max-w-md bg-[#1E293B] border border-sky-900/60 rounded-2xl shadow-2xl overflow-hidden relative z-10">
         {/* Brand Header */}
-        <div className="bg-[#0F172A] p-6 text-center border-b border-[#334155]">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#0F172A] shadow-xl mb-3 p-1 border border-slate-700/60">
-            <img
-              src="/uzx-logo.png"
-              alt="UZX Wallet Logo"
-              className="w-full h-full rounded-xl object-contain"
-              referrerPolicy="no-referrer"
-            />
+        <div className="bg-[#0F172A] p-6 text-center border-b border-sky-900/60">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-700 to-sky-500 shadow-lg shadow-sky-900/50 mb-3 border border-sky-400/30 font-black font-mono text-white text-2xl tracking-wider">
+            OS
           </div>
-          <h1 className="text-2xl font-black tracking-widest text-white flex items-center justify-center gap-1.5">
-            UZX <span className="text-rose-400 font-bold text-lg">WALLET</span>
+          <h1 className="text-2xl font-black tracking-wider text-white flex items-center justify-center gap-2">
+            Management <span className="text-sky-400 font-bold text-xl">OS</span>
           </h1>
-          <p className="text-[11px] text-slate-400 font-mono tracking-wider uppercase mt-1">
-            UZX FINANCIAL OS & OPERATIONS GATEWAY
+          <p className="text-[11px] text-sky-300/80 font-mono tracking-wider uppercase mt-1">
+            MANAGEMENT OS & AGENT OPERATIONS TERMINAL
           </p>
         </div>
 
@@ -88,7 +83,7 @@ export const LoginView: React.FC = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter username"
-                  className="w-full pl-9 pr-3 py-2.5 bg-[#0F172A] text-white border border-[#334155] rounded-lg text-xs font-mono focus:outline-none focus:border-[#8B1E2D] focus:ring-1 focus:ring-[#8B1E2D] transition-all placeholder:text-slate-500"
+                  className="w-full pl-9 pr-3 py-2.5 bg-[#0F172A] text-white border border-[#334155] rounded-lg text-xs font-mono focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all placeholder:text-slate-500"
                   autoFocus
                 />
               </div>
@@ -107,7 +102,7 @@ export const LoginView: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-9 pr-3 py-2.5 bg-[#0F172A] text-white border border-[#334155] rounded-lg text-xs font-mono focus:outline-none focus:border-[#8B1E2D] focus:ring-1 focus:ring-[#8B1E2D] transition-all placeholder:text-slate-500"
+                  className="w-full pl-9 pr-3 py-2.5 bg-[#0F172A] text-white border border-[#334155] rounded-lg text-xs font-mono focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all placeholder:text-slate-500"
                 />
               </div>
             </div>
@@ -116,7 +111,7 @@ export const LoginView: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 bg-[#8B1E2D] hover:bg-[#721825] text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
+            className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-lg shadow-sky-950/50 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
           >
             {isLoading ? (
               <span>Authenticating...</span>
@@ -132,7 +127,7 @@ export const LoginView: React.FC = () => {
 
       {/* Footer Info */}
       <div className="mt-6 text-center text-[11px] text-slate-500 font-mono">
-        UZX Wallet Financial Systems • Encrypted SSL Connection
+        Management OS Operations Gateway • Encrypted SSL Connection
       </div>
     </div>
   );

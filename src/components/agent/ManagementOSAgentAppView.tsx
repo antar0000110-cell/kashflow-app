@@ -192,20 +192,20 @@ export const ManagementOSAgentAppView: React.FC = () => {
         <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             {/* Logo OS */}
-            <div className="w-9 h-9 rounded-xl bg-slate-950 border-2 border-emerald-500/80 flex items-center justify-center font-black font-mono text-white text-sm shadow-md">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-700 to-sky-500 border-2 border-sky-400/80 flex items-center justify-center font-black font-mono text-white text-sm shadow-md">
               OS
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-black tracking-wider text-white">Management OS</span>
-                <span className="px-1.5 py-0.2 text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 rounded">
+                <span className="px-1.5 py-0.2 text-[9px] font-bold bg-sky-950 text-sky-300 border border-sky-800 rounded">
                   AGENT APP
                 </span>
               </div>
               <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
                 <span>{currentAgent?.name || 'Agent Terminal'}</span>
                 <span className="text-slate-600">•</span>
-                <span className="text-emerald-400">{currentAgent?.username}</span>
+                <span className="text-sky-400">{currentAgent?.username}</span>
               </div>
             </div>
           </div>

@@ -144,13 +144,13 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
         ),
       }));
 
-      soundManager.playTransactionChime();
-
       addNotification({
         title: `Inbound Order Dispatched: ${formatCurrency(amount, 'USDT')}`,
         message: `Order #${txId} assigned to [${targetAgent?.name || 'Agent'}]. Client: ${customerName} (${customerPhone})`,
         type: 'info',
         targetSection: 'pending-deposits',
+        targetAgentId: targetAgent ? targetAgent.id : undefined,
+        targetAudience: 'agent',
       });
     } else {
       const newWithdrawal: Transaction = {
@@ -190,13 +190,13 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
         ),
       }));
 
-      soundManager.playTransactionChime();
-
       addNotification({
         title: `Withdrawal Order Dispatched: ${formatCurrency(amount, 'USDT')}`,
         message: `Payout #${txId} assigned to [${targetAgent?.name || 'Agent'}]. Recipient: ${customerName} (${customerPhone})`,
         type: 'info',
         targetSection: 'pending-withdrawals',
+        targetAgentId: targetAgent ? targetAgent.id : undefined,
+        targetAudience: 'agent',
       });
     }
 

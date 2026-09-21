@@ -80,6 +80,39 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
 
   const isSessionActive = Boolean(hasValidSession || (isAuthenticated && authRole !== 'guest'));
 
+  // Dynamic Branding and PWA Icons Head Manager
+  useEffect(() => {
+    const isAgentOrAdmin = authRole === 'agent' || authRole === 'admin' || activePortal === 'agent' || activePortal === 'admin';
+    const appSub = isAgentOrAdmin ? 'Management OS - Agent Operations Terminal' : 'UZX Wallet - Fast TRC20 Gateway';
+    const iconSvg = isAgentOrAdmin ? '/management-os-icon.svg' : '/uzx-wallet-icon.svg';
+    const iconJpg = isAgentOrAdmin ? '/management-os-icon.jpg' : '/uzx-wallet-icon.jpg';
+    const manifestPath = isAgentOrAdmin ? '/manifest-management-os.json' : '/manifest-uzx-wallet.json';
+    const themeColor = isAgentOrAdmin ? '#0EA5E9' : '#8B1E2D';
+
+    document.title = appSub;
+
+    const manifestLink = document.getElementById('app-manifest-link') as HTMLLinkElement;
+    if (manifestLink) manifestLink.href = manifestPath;
+
+    const svgIcon = document.getElementById('app-favicon-svg') as HTMLLinkElement;
+    if (svgIcon) svgIcon.href = iconSvg;
+
+    const pngIcon = document.getElementById('app-favicon-png') as HTMLLinkElement;
+    if (pngIcon) pngIcon.href = iconJpg;
+
+    const appleIcon = document.getElementById('app-apple-icon') as HTMLLinkElement;
+    if (appleIcon) appleIcon.href = iconJpg;
+
+    const themeMeta = document.getElementById('app-theme-color') as HTMLMetaElement;
+    if (themeMeta) themeMeta.content = themeColor;
+
+    const ogTitle = document.getElementById('og-title') as HTMLMetaElement;
+    if (ogTitle) ogTitle.content = appSub;
+
+    const ogImage = document.getElementById('og-image') as HTMLMetaElement;
+    if (ogImage) ogImage.content = iconJpg;
+  }, [authRole, activePortal]);
+
   // Connect socket upon valid persistent session mounting
   useEffect(() => {
     if (isSessionActive && authRole !== 'guest') {

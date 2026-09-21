@@ -1,0 +1,24 @@
+{
+  "short_name": "UZX Wallet",
+  "name": "UZX Wallet - Fast TRC20 Crypto Gateway",
+  "description": "Official Fast Electronic Wallet & USDT TRC20 Gateway",
+  "icons": [
+    {
+      "src": "/uzx-wallet-icon.jpg",
+      "type": "image/jpeg",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/uzx-wallet-icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0F172A",
+  "theme_color": "#8B1E2D",
+  "display": "standalone",
+  "orientation": "portrait"
+}

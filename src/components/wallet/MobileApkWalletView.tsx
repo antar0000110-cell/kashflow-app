@@ -292,12 +292,12 @@ export const MobileApkWalletView: React.FC = () => {
     e.preventDefault();
     if (depositAmount <= 0) return;
     triggerHaptic("light");
-    playSynthesizedChime('cash');
     setDepositSuccess(true);
     sendNativePushNotification(
       'Deposit Successful',
       `Credited ${formatCurrency(depositAmount, 'USDT')} to wallet ${activeWalletNumber} via ${depositMethod}.`,
-      'success'
+      'success',
+      { targetAudience: 'user', targetUserId: activeWalletNumber }
     );
     setTimeout(() => {
       setDepositSuccess(false);
@@ -310,12 +310,12 @@ export const MobileApkWalletView: React.FC = () => {
     e.preventDefault();
     if (withdrawAmount <= 0 || withdrawAmount > userBalance) return;
     triggerHaptic("light");
-    playSynthesizedChime('cash');
     setWithdrawSuccess(true);
     sendNativePushNotification(
       'Cash-Out Completed',
       `Processed payout of ${formatCurrency(withdrawAmount, 'USDT')} to ${withdrawRecipient}.`,
-      'info'
+      'info',
+      { targetAudience: 'user', targetUserId: activeWalletNumber }
     );
     setTimeout(() => {
       setWithdrawSuccess(false);
@@ -340,12 +340,12 @@ export const MobileApkWalletView: React.FC = () => {
     }
 
     triggerHaptic("light");
-    playSynthesizedChime('cash');
     setTransferSuccess(true);
     sendNativePushNotification(
       'تم إرسال التحويل',
       `تم تحويل ${formatCurrency(transferAmount, 'USDT')} بنجاح إلى ${transferTarget}.`,
-      'success'
+      'success',
+      { targetAudience: 'user', targetUserId: activeWalletNumber }
     );
     setTimeout(() => {
       setTransferSuccess(false);
@@ -380,35 +380,15 @@ export const MobileApkWalletView: React.FC = () => {
   });
 
   return (
-    <div className="p-2 sm:p-4 md:p-6 flex flex-col items-center justify-center min-h-[calc(100vh-80px)] bg-slate-100 font-sans">
-      {/* Container Device Mockup Wrapper */}
-      <div className="w-full max-w-[410px] bg-white sm:rounded-[36px] rounded-2xl shadow-2xl border-2 sm:border-4 border-slate-300 overflow-hidden flex flex-col h-[760px] max-h-[90vh] sm:max-h-[760px] relative">
+    <div className="p-2 sm:p-4 md:p-6 min-h-[calc(100vh-80px)] w-full bg-slate-950 font-sans flex flex-col items-center justify-start">
+      {/* Full Screen Wallet Application Container */}
+      <div className="w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[720px] relative">
         <OfflineStateBanner />
-        {/* Mobile Status Bar */}
-        <div className="px-6 pt-3 pb-1 flex items-center justify-between text-[11px] font-mono text-slate-700 bg-white shrink-0 select-none">
-          <span className="font-semibold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                triggerHaptic("light");
-                setIsNotificationModalOpen(true);
-              }}
-              className="p-1 rounded text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
-              title="Push Notification Settings"
-            >
-              <BellRing className={`w-3 h-3 ${getNativePermission() === 'granted' ? 'text-emerald-600' : 'text-amber-500 animate-pulse'}`} />
-            </button>
-            <span className="text-[10px] font-bold text-emerald-600">TRON Network 4G+</span>
-            <div className="w-5 h-2.5 border border-slate-400 rounded-2xs flex items-center p-0.5">
-              <div className="w-full h-full bg-emerald-500 rounded-3xs" />
-            </div>
-          </div>
-        </div>
 
         {/* NOT LOGGED IN: LOGIN VIEW WITH SAVED HISTORY DROPDOWN & MANUAL OTP */}
         {!isLoggedIn ? (
-          <div className="flex-1 p-6 flex flex-col justify-between bg-slate-50 overflow-y-auto">
-            <div className="space-y-6 pt-4 text-center">
+          <div className="flex-1 p-6 md:p-12 flex flex-col items-center justify-center bg-slate-900 overflow-y-auto">
+            <div className="w-full max-w-md bg-slate-950 p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl space-y-6 text-center">
               {/* Brand Logo */}
               <div
                 className="w-20 h-20 rounded-2xl p-1.5 flex items-center justify-center mx-auto shadow-xl border border-slate-700/60"
@@ -420,10 +400,10 @@ export const MobileApkWalletView: React.FC = () => {
               </div>
 
               <div>
-                <h2 className="text-xl font-black tracking-wide text-slate-900 uppercase">
+                <h2 className="text-xl font-black tracking-wide text-white uppercase">
                   {walletTemplate?.appName || 'UZX WALLET'}
                 </h2>
-                <p className="text-xs text-slate-500 mt-1 font-medium">
+                <p className="text-xs text-slate-400 mt-1 font-medium">
                   {walletTemplate?.brandTagline || 'Official TRC20 Fast Electronic Wallet Gateway'}
                 </p>
               </div>
@@ -535,10 +515,10 @@ export const MobileApkWalletView: React.FC = () => {
                   </div>
                 </form>
               )}
-            </div>
 
-            <div className="text-center text-[10px] text-slate-400 font-mono py-2">
-              UZX Secure Mobile Wallet Engine v4.2
+              <div className="text-center text-[10px] text-slate-500 font-mono pt-2">
+                Official TRC20 Fast Electronic Wallet Engine
+              </div>
             </div>
           </div>
         ) : (
