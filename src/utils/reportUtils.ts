@@ -38,7 +38,7 @@ export interface CurrencyVolumeSummary {
 }
 
 /**
- * Aggregates total transaction liquidity volume by currency (EGP vs USD) per agent.
+ * Aggregates total transaction liquidity volume by currency (USDT vs USD) per agent.
  * Allows administrators and financial reports to inspect volume breakdown per currency.
  */
 export function aggregateVolumeByCurrency(
@@ -69,7 +69,7 @@ export function aggregateVolumeByCurrency(
     let otherVol = 0;
 
     agentTxs.forEach((tx) => {
-      const cur = (tx.currency || agent.currency || 'EGP').toUpperCase();
+      const cur = (tx.currency || agent.currency || 'USDT').toUpperCase();
       const amt = tx.amount || 0;
 
       if (cur === 'EGP') {
@@ -111,7 +111,7 @@ export function aggregateVolumeByCurrency(
     return {
       agentId: agent.id,
       agentName: agent.name,
-      baseCurrency: agent.currency || 'EGP',
+      baseCurrency: agent.currency || 'USDT',
       egpDepositVolume: egpDepVol,
       egpWithdrawalVolume: egpWdlVol,
       egpTotalVolume: egpTotal,

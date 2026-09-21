@@ -207,7 +207,7 @@ export const TrafficDistributionMonitor: React.FC<TrafficDistributionMonitorProp
               Avg Volume / Agent
             </span>
             <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400 mt-0.5">
-              {formatCurrency(report.averageVolumePerAgent, 'EGP')}
+              {formatCurrency(report.averageVolumePerAgent, 'USDT')}
             </div>
             <span className="text-[10px] text-slate-400 block mt-1">Today&apos;s average</span>
           </div>

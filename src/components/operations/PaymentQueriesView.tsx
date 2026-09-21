@@ -54,15 +54,15 @@ export const PaymentQueriesView: React.FC<{ isAgentMode?: boolean }> = ({ isAgen
       agentId: 'AGT-01',
       agentName: 'Agent Ahmed (Operations)',
       customerName: 'Mohamed Tarek Hassan',
-      walletNumber: '01031860138',
-      subject: 'Delay in telecom SMS confirmation for inbound Vodafone Cash deposit',
+      walletNumber: 'TSa9281hG82ks901847192',
+      subject: 'Delay in TRC20 network confirmation for inbound transfer',
       category: 'Missing Balance Credit',
       amount: 500,
-      currency: 'EGP',
+      currency: 'USDT',
       status: 'Under Investigation',
       createdAt: '2026-09-19 11:45:00',
-      description: 'Customer transferred from personal wallet at 11:40. Telecom network SMS delayed. Screenshot verified.',
-      adminNotes: 'Contacting Vodafone Cash gateway for instant reconciliation.',
+      description: 'Customer transferred from personal wallet at 11:40. Network node sync delayed. TxHash verified.',
+      adminNotes: 'Contacting TRC20 gateway node for instant reconciliation.',
     },
     {
       id: 'PQ-9042',
@@ -70,14 +70,14 @@ export const PaymentQueriesView: React.FC<{ isAgentMode?: boolean }> = ({ isAgen
       agentId: 'AGT-02',
       agentName: 'Agent Mohamed (Delta Hub)',
       customerName: 'Sarah Samir Zaki',
-      walletNumber: '01018073883',
-      subject: 'InstaPay reference check and manual ledger verification',
+      walletNumber: 'TX5z81pA92ks891047192',
+      subject: 'TRC20 transaction hash verification and manual ledger check',
       category: 'Receipt Mismatch',
       amount: 1200,
-      currency: 'EGP',
+      currency: 'USDT',
       status: 'Pending',
       createdAt: '2026-09-19 12:10:00',
-      description: 'InstaPay Ref: 8492019482. Ledger check required for automatic clearance.',
+      description: 'TRC20 TxHash: 8492019482. Ledger check required for automatic clearance.',
     },
     {
       id: 'PQ-9043',
@@ -85,15 +85,15 @@ export const PaymentQueriesView: React.FC<{ isAgentMode?: boolean }> = ({ isAgen
       agentId: 'AGT-03',
       agentName: 'Agent Sarah (Cairo Express)',
       customerName: 'Khaled Omar Mostafa',
-      walletNumber: '01007878721',
+      walletNumber: 'TY7x902rT91ks892019482',
       subject: 'Wallet Daily Limit Threshold Inquiry',
       category: 'Wallet Daily Limit',
       amount: 3500,
-      currency: 'EGP',
+      currency: 'USDT',
       status: 'Approved',
       createdAt: '2026-09-19 10:20:00',
-      description: 'Requested limit extension on primary InstaPay SIM for today.',
-      adminNotes: 'Limit raised to 60,000 EGP.',
+      description: 'Requested limit extension on primary wallet node for today.',
+      adminNotes: 'Limit raised to 60,000 USDT.',
     }
   ]);
 
@@ -131,11 +131,11 @@ export const PaymentQueriesView: React.FC<{ isAgentMode?: boolean }> = ({ isAgen
       agentId: currentAgent?.id || 'AGT-01',
       agentName: currentAgent?.name || 'Agent Workspace',
       customerName: newCustomerName || 'Client Order',
-      walletNumber: newWalletNumber || '01000000000',
+      walletNumber: newWalletNumber || 'TSa9281hG82ks901847192',
       subject: newSubject,
       category: newCategory,
       amount: Number(newAmount),
-      currency: 'EGP',
+      currency: 'USDT',
       status: 'Pending',
       createdAt: formatCairoTime(new Date()),
       description: newDescription,
@@ -335,7 +335,7 @@ export const PaymentQueriesView: React.FC<{ isAgentMode?: boolean }> = ({ isAgen
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Delayed SMS receipt for 500 EGP transfer"
+                  placeholder="e.g. Delayed network confirmation for 500 USDT transfer"
                   value={newSubject}
                   onChange={(e) => setNewSubject(e.target.value)}
                   className="w-full h-8 px-2.5 border border-slate-300 rounded text-slate-900 focus:ring-1 focus:ring-[#8B1E2D]"
@@ -355,7 +355,7 @@ export const PaymentQueriesView: React.FC<{ isAgentMode?: boolean }> = ({ isAgen
                 </div>
 
                 <div>
-                  <label className="block text-slate-600 font-semibold mb-1">Disputed Amount (EGP)</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Disputed Amount (USDT)</label>
                   <input
                     type="number"
                     value={newAmount}
@@ -366,10 +366,10 @@ export const PaymentQueriesView: React.FC<{ isAgentMode?: boolean }> = ({ isAgen
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Wallet Phone Number</label>
+                <label className="block text-slate-600 font-semibold mb-1">Wallet ID</label>
                 <input
                   type="text"
-                  placeholder="e.g. 01031860138"
+                  placeholder="e.g. TSa9281hG82ks901847192"
                   value={newWalletNumber}
                   onChange={(e) => setNewWalletNumber(e.target.value)}
                   className="w-full h-8 px-2.5 border border-slate-300 rounded font-mono text-slate-900"

@@ -39,6 +39,7 @@ export const AgentManagementView: React.FC = () => {
     setSelectedAgentId,
     setActiveSection,
     wallets,
+    setSelectedAgentDetailId,
   } = useAppStore();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -71,8 +72,8 @@ export const AgentManagementView: React.FC = () => {
     { id: 'wt3', minVolume: 200001, maxVolume: 0, ratePercent: 2.0 },
   ]);
   const [currency, setCurrency] = useState('USDT');
-  const [depositMethod, setDepositMethod] = useState('Vodafone Cash');
-  const [depositAddress, setDepositAddress] = useState('01031860138');
+  const [depositMethod, setDepositMethod] = useState('TRC20 Network');
+  const [depositAddress, setDepositAddress] = useState('TSa9281hG82ks901847192');
 
   // Payment Methods State
   const { paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod } = useAppStore();
@@ -116,9 +117,9 @@ export const AgentManagementView: React.FC = () => {
       { id: 'wt2', minVolume: 50001, maxVolume: 200000, ratePercent: 1.5 },
       { id: 'wt3', minVolume: 200001, maxVolume: 0, ratePercent: 2.0 },
     ]);
-    setCurrency('EGP');
-    setDepositMethod(paymentMethods[0] || 'Vodafone Cash');
-    setDepositAddress('01031860138');
+    setCurrency('USDT');
+    setDepositMethod(paymentMethods[0] || 'TRC20 Network');
+    setDepositAddress('TSa9281hG82ks901847192');
     setIsAddModalOpen(true);
   };
 
@@ -156,9 +157,9 @@ export const AgentManagementView: React.FC = () => {
             { id: 'wt3', minVolume: 200001, maxVolume: 0, ratePercent: 2.0 },
           ]
     );
-    setCurrency(a.currency || 'EGP');
-    setDepositMethod(a.depositMethod || a.depositPaymentMethod || 'Vodafone Cash');
-    setDepositAddress(a.depositAddress || a.depositPaymentAddress || '01031860138');
+    setCurrency(a.currency || 'USDT');
+    setDepositMethod(a.depositMethod || a.depositPaymentMethod || 'TRC20 Network');
+    setDepositAddress(a.depositAddress || a.depositPaymentAddress || 'TSa9281hG82ks901847192');
     setIsAddModalOpen(true);
   };
 
@@ -330,7 +331,7 @@ export const AgentManagementView: React.FC = () => {
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-lg font-bold font-mono text-[#8B1E2D]">
-            {formatCurrency(totalInsurance, 'EGP')}
+            {formatCurrency(totalInsurance, 'USDT')}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             Available insurance balance
@@ -343,7 +344,7 @@ export const AgentManagementView: React.FC = () => {
             <DollarSign className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-lg font-bold font-mono text-emerald-700">
-            {formatCurrency(totalAgentProfits, 'EGP')}
+            {formatCurrency(totalAgentProfits, 'USDT')}
           </div>
           <div className="text-[11px] text-emerald-600 font-medium mt-1">
             Accumulated commissions
@@ -367,7 +368,7 @@ export const AgentManagementView: React.FC = () => {
             <DollarSign className="w-4 h-4 text-amber-600" />
           </div>
           <div className="text-lg font-bold font-mono text-slate-900">
-            {formatCurrency(totalVolume, 'EGP')}
+            {formatCurrency(totalVolume, 'USDT')}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             Total lifetime volume
@@ -392,7 +393,7 @@ export const AgentManagementView: React.FC = () => {
                 <div>
                   <div className="font-bold text-slate-900">{req.agentName}</div>
                   <div className="text-slate-500 text-[11px]">
-                    Requested: <strong className="text-[#8B1E2D] font-mono">{formatCurrency(req.requestedAmount || req.amountRequested, 'EGP')}</strong> via {req.paymentMethod}
+                    Requested: <strong className="text-[#8B1E2D] font-mono">{formatCurrency(req.requestedAmount || req.amountRequested, req.currency || 'USDT')}</strong> via {req.paymentMethod}
                   </div>
                   <div className="text-[10px] text-slate-400 font-mono mt-0.5">Ref: {req.txReference || req.referenceNumber || req.id}</div>
                 </div>
@@ -449,15 +450,15 @@ export const AgentManagementView: React.FC = () => {
                     </td>
 
                     <td className="py-2.5 px-3 font-mono font-bold text-[#8B1E2D]">
-                      {formatCurrency(agent.insuranceDeposit, agent.currency || 'EGP')}
+                      {formatCurrency(agent.insuranceDeposit, agent.currency || 'USDT')}
                     </td>
 
                     <td className="py-2.5 px-3 font-mono">
                       <div className="font-bold text-emerald-700 text-[12px]">
-                        +{formatCurrency(agent.profitBalance || 0, agent.currency || 'EGP')}
+                        +{formatCurrency(agent.profitBalance || 0, agent.currency || 'USDT')}
                       </div>
                       <div className="text-[10px] text-slate-400">
-                        Total: {formatCurrency(agent.totalEarnedCommission || agent.profitBalance || 0, agent.currency || 'EGP')}
+                        Total: {formatCurrency(agent.totalEarnedCommission || agent.profitBalance || 0, agent.currency || 'USDT')}
                       </div>
                     </td>
 
@@ -484,7 +485,7 @@ export const AgentManagementView: React.FC = () => {
 
                     <td className="py-2.5 px-3">
                       <span className="px-2 py-0.5 bg-slate-100 rounded text-[11px] font-mono font-bold text-slate-800 border border-slate-200">
-                        {agent.currency || 'EGP'}
+                        {agent.currency || 'USDT'}
                       </span>
                     </td>
 
@@ -498,7 +499,7 @@ export const AgentManagementView: React.FC = () => {
                     </td>
 
                     <td className="py-2.5 px-3 font-mono font-semibold text-slate-800">
-                      {formatCurrency(agent.dailyOrderLimit?.dailyMoneyCap || 50000, agent.currency || 'EGP')}
+                      {formatCurrency(agent.dailyOrderLimit?.dailyMoneyCap || 50000, agent.currency || 'USDT')}
                     </td>
 
                     <td className="py-2.5 px-3 text-center">
@@ -529,11 +530,20 @@ export const AgentManagementView: React.FC = () => {
                       <span className="text-[10px] text-slate-400">wallets</span>
                     </td>
 
-                    <td className="py-2.5 px-3 text-right">
+                     <td className="py-2.5 px-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => setSelectedAgentDetailId(agent.id)}
+                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer"
+                          title="View Agent Profile & Operations"
+                        >
+                          <Users className="w-3 h-3 text-slate-600" />
+                          <span>Profile</span>
+                        </button>
+
+                        <button
                           onClick={() => handleLoginAsAgent(agent.id)}
-                          className="px-2 py-1 bg-[#8B1E2D] hover:bg-[#721825] text-white rounded text-[11px] font-semibold flex items-center gap-1 shadow-2xs"
+                          className="px-2 py-1 bg-[#8B1E2D] hover:bg-[#721825] text-white rounded text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer"
                           title="Open Agent Operational Terminal"
                         >
                           <ExternalLink className="w-3 h-3" />
@@ -542,7 +552,7 @@ export const AgentManagementView: React.FC = () => {
 
                         <button
                           onClick={() => handleOpenEdit(agent)}
-                          className="p-1 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                          className="p-1 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
                           title="Edit Quotas & Limits"
                         >
                           <Edit className="w-3.5 h-3.5" />
@@ -566,7 +576,7 @@ export const AgentManagementView: React.FC = () => {
               <span>Payment Methods Management</span>
             </h3>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Admin control over system-wide supported payment methods (Vodafone Cash, InstaPay, Orange Cash, etc.).
+              Admin control over system-wide supported payment methods (TRC20 Network, TRON Direct, USDT Hot Wallet, etc.).
             </p>
           </div>
 
@@ -674,13 +684,13 @@ export const AgentManagementView: React.FC = () => {
 
             <div className="text-xs space-y-2">
               <div>Agent: <strong className="text-slate-900">{reviewingReq.agentName}</strong></div>
-              <div>Requested Amount: <strong className="text-[#8B1E2D] font-mono">{formatCurrency(reviewingReq.requestedAmount || reviewingReq.amountRequested, 'EGP')}</strong></div>
+              <div>Requested Amount: <strong className="text-[#8B1E2D] font-mono">{formatCurrency(reviewingReq.requestedAmount || reviewingReq.amountRequested, reviewingReq.currency || 'USDT')}</strong></div>
               <div>Method: <span className="font-mono">{reviewingReq.paymentMethod}</span></div>
               <div>Proof / Ref: <span className="font-mono text-slate-600">{reviewingReq.txReference || reviewingReq.referenceNumber || '-'}</span></div>
             </div>
 
             <div>
-              <label className="block text-slate-600 text-xs font-semibold mb-1">Approved Credit Amount (EGP)</label>
+              <label className="block text-slate-600 text-xs font-semibold mb-1">Approved Credit Amount (USDT)</label>
               <input
                 type="number"
                 value={customApproveAmount}
@@ -748,10 +758,10 @@ export const AgentManagementView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-600 font-semibold mb-1">Phone Number</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Wallet ID</label>
                   <input
                     type="text"
-                    placeholder="010..."
+                    placeholder="Wallet ID (e.g. T...)"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full h-8 px-2.5 border border-slate-300 rounded bg-white text-slate-800 font-mono"
@@ -808,12 +818,12 @@ export const AgentManagementView: React.FC = () => {
                       onChange={(e) => setCurrency(e.target.value.toUpperCase())}
                       className="w-full h-8 px-2 border border-slate-300 rounded font-mono font-bold bg-white text-slate-800 cursor-pointer"
                     >
-                      <option value="EGP">EGP - Egyptian Pound (الجنيه المصري)</option>
-                      <option value="USD">USD - US Dollar (الدولار الأمريكي)</option>
                       <option value="USDT">USDT - Tether (دولار رقمي)</option>
+                      <option value="USD">USD - US Dollar (الدولار الأمريكي)</option>
                       <option value="EUR">EUR - Euro (يورو)</option>
                       <option value="SAR">SAR - Saudi Riyal (ريال سعودي)</option>
                       <option value="AED">AED - UAE Dirham (درهم إماراتي)</option>
+                      <option value="GBP">GBP - British Pound (جنيه إسترليني)</option>
                     </select>
                   </div>
                 </div>
@@ -1065,7 +1075,7 @@ export const AgentManagementView: React.FC = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-slate-600 font-semibold mb-1">Deposit Address / Phone</label>
+                    <label className="block text-slate-600 font-semibold mb-1">Deposit Wallet ID / Address</label>
                     <input
                       type="text"
                       value={depositAddress}

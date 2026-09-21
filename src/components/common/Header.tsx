@@ -120,7 +120,7 @@ export const Header: React.FC = () => {
                 UZX <span className="text-rose-400 font-bold">{authRole === 'admin' ? 'OS' : 'AGENT'}</span>
               </span>
               <span className="text-[9px] text-slate-400 font-mono tracking-tight hidden sm:block">
-                {authRole === 'admin' ? 'EGYPT REAL-TIME FINANCIAL OS' : 'AUTHORIZED AGENT TERMINAL'}
+                {authRole === 'admin' ? 'GLOBAL REAL-TIME FINANCIAL OS' : 'AUTHORIZED AGENT TERMINAL'}
               </span>
             </div>
           </div>

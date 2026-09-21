@@ -1,6 +1,6 @@
 {
   "name": "UZX Wallet Financial OS",
-  "description": "Enterprise Egyptian fintech platform with real-time Cairo operations, automated wallet traffic engine, subagent quota routing, and light mobile wallet terminal.",
+  "description": "Enterprise global fintech platform with real-time USDT transactions, TRC20 network nodes, automated wallet traffic engine, subagent quota routing, and light mobile wallet terminal.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -257,6 +257,148 @@ class ApiService {
     }
   }
 
+  public async getWalletTemplate(): Promise<any> {
+    try {
+      const res = await fetch('/api/wallet-template');
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.template;
+    } catch {
+      return null;
+    }
+  }
+
+  public async updateWalletTemplate(template: any): Promise<any> {
+    try {
+      const res = await this.request('/api/wallet-template', {
+        method: 'POST',
+        body: JSON.stringify(template),
+      });
+      const json = await res.json();
+      return json.template;
+    } catch (err) {
+      console.error('[API Client] Update wallet template failed:', err);
+      return null;
+    }
+  }
+
+  public async getDisputes(): Promise<any[]> {
+    try {
+      const res = await this.request('/api/disputes');
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.disputes || [];
+    } catch {
+      return [];
+    }
+  }
+
+  public async createDispute(dispute: any): Promise<any> {
+    try {
+      const res = await this.request('/api/disputes', {
+        method: 'POST',
+        body: JSON.stringify(dispute),
+      });
+      const json = await res.json();
+      return json.dispute;
+    } catch (err) {
+      console.error('[API Client] Create dispute failed:', err);
+      return null;
+    }
+  }
+
+  public async updateDispute(id: string, updates: any): Promise<any> {
+    try {
+      const res = await this.request(`/api/disputes/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+      const json = await res.json();
+      return json.dispute;
+    } catch (err) {
+      console.error('[API Client] Update dispute failed:', err);
+      return null;
+    }
+  }
+
+  public async getAgentDepositRequests(): Promise<any[]> {
+    try {
+      const res = await this.request('/api/agent-deposit-requests');
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.requests || [];
+    } catch {
+      return [];
+    }
+  }
+
+  public async createAgentDepositRequest(req: any): Promise<any> {
+    try {
+      const res = await this.request('/api/agent-deposit-requests', {
+        method: 'POST',
+        body: JSON.stringify(req),
+      });
+      const json = await res.json();
+      return json.request;
+    } catch (err) {
+      console.error('[API Client] Create deposit request failed:', err);
+      return null;
+    }
+  }
+
+  public async updateAgentDepositRequest(id: string, status: string, amountApproved?: number): Promise<any> {
+    try {
+      const res = await this.request(`/api/agent-deposit-requests/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status, amountApproved }),
+      });
+      const json = await res.json();
+      return json.request;
+    } catch (err) {
+      console.error('[API Client] Update deposit request failed:', err);
+      return null;
+    }
+  }
+
+  public async getAgentPayouts(): Promise<any[]> {
+    try {
+      const res = await this.request('/api/agent-payouts');
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.payouts || [];
+    } catch {
+      return [];
+    }
+  }
+
+  public async createAgentPayout(payout: any): Promise<any> {
+    try {
+      const res = await this.request('/api/agent-payouts', {
+        method: 'POST',
+        body: JSON.stringify(payout),
+      });
+      const json = await res.json();
+      return json.payout;
+    } catch (err) {
+      console.error('[API Client] Create payout failed:', err);
+      return null;
+    }
+  }
+
+  public async updateBotConfig(config: any): Promise<any> {
+    try {
+      const res = await this.request('/api/bot-config', {
+        method: 'PATCH',
+        body: JSON.stringify(config),
+      });
+      const json = await res.json();
+      return json.config;
+    } catch (err) {
+      console.error('[API Client] Update bot config failed:', err);
+      return null;
+    }
+  }
+
   public async resetSystemData(): Promise<boolean> {
     try {
       const res = await this.request('/api/admin/reset-system-data', {
@@ -271,3 +413,4 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
+

@@ -40,7 +40,7 @@ export const DepositRequestsView: React.FC = () => {
   const [columns, setColumns] = useState<ColumnDefinition[]>([
     { key: 'transactionId', label: 'Order ID', visible: true },
     { key: 'user', label: 'Customer Name', visible: true },
-    { key: 'amount', label: 'Amount (EGP)', visible: true },
+    { key: 'amount', label: 'Amount (USDT)', visible: true },
     { key: 'status', label: 'Status', visible: true },
     { key: 'bankName', label: 'Bank / Gateway', visible: true },
     { key: 'provider', label: 'Provider', visible: true },
@@ -135,7 +135,7 @@ export const DepositRequestsView: React.FC = () => {
           <div>
             <input
               type="number"
-              placeholder="Min Amount EGP"
+              placeholder="Min Amount USDT"
               value={minAmount}
               onChange={(e) => setMinAmount(e.target.value)}
               className="w-full h-7 px-2 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:ring-1 focus:ring-[#8B1E2D]"
@@ -145,7 +145,7 @@ export const DepositRequestsView: React.FC = () => {
           <div>
             <input
               type="number"
-              placeholder="Max Amount EGP"
+              placeholder="Max Amount USDT"
               value={maxAmount}
               onChange={(e) => setMaxAmount(e.target.value)}
               className="w-full h-7 px-2 border border-slate-300 rounded text-xs bg-white text-slate-800 focus:ring-1 focus:ring-[#8B1E2D]"

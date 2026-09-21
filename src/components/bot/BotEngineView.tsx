@@ -49,9 +49,9 @@ export const BotEngineView: React.FC = () => {
   const [selectedAgentForDispatch, setSelectedAgentForDispatch] = useState<string>('');
 
   const [recentGeneratedLog, setRecentGeneratedLog] = useState<string[]>([
-    `[${formatCairoTime(new Date())}] Bot Engine active with 6,000 randomized Egyptian wallet registry`,
+    `[${formatCairoTime(new Date())}] Bot Engine active with 6,000 randomized TRC20 wallet registry`,
     `[${formatCairoTime(new Date())}] Dynamic deposit/withdrawal ratio set to 70/30 with ±10% random bot jitter`,
-    `[${formatCairoTime(new Date())}] Pulse timer synchronized with Africa/Cairo real-time clock`,
+    `[${formatCairoTime(new Date())}] Pulse timer synchronized with real-time operational clock`,
     `[${formatCairoTime(new Date())}] Automatic agent quota balancer armed`
   ]);
 
@@ -142,7 +142,7 @@ export const BotEngineView: React.FC = () => {
           </div>
           <div className="text-lg font-bold font-mono text-[#8B1E2D]">6,000</div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Vodafone, Orange, Etisalat, InstaPay
+            TRC20, TRON Direct, USDT Hot Wallet, Liquidity Node
           </div>
         </div>
 
@@ -225,7 +225,7 @@ export const BotEngineView: React.FC = () => {
                     <td className="py-3 px-3">
                       <div className="font-semibold text-slate-900">{agent.name}</div>
                       <div className="text-[10px] text-slate-500 font-mono">
-                        Insurance: {formatCurrency(agent.insuranceDeposit, 'EGP')} • Threshold: {formatCurrency(agent.trafficThreshold, 'EGP')}
+                        Insurance: {formatCurrency(agent.insuranceDeposit, 'USDT')} • Threshold: {formatCurrency(agent.trafficThreshold, 'USDT')}
                       </div>
                     </td>
 
@@ -452,7 +452,7 @@ export const BotEngineView: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Min Order Amount (EGP)</label>
+                <label className="block text-slate-600 font-semibold mb-1">Min Order Amount (USDT)</label>
                 <input
                   type="number"
                   value={minDeposit}
@@ -462,7 +462,7 @@ export const BotEngineView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Max Order Amount (EGP)</label>
+                <label className="block text-slate-600 font-semibold mb-1">Max Order Amount (USDT)</label>
                 <input
                   type="number"
                   value={maxDeposit}

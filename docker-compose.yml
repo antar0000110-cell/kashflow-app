@@ -9,11 +9,10 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file:
-      - .env
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - JWT_SECRET=uzx_production_secret_key_cairo_finance_2026_secure
       - DATA_DIR=/app/data
     volumes:
       - uzx_db_data:/app/data

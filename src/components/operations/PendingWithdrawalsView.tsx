@@ -87,7 +87,7 @@ export const PendingWithdrawalsView: React.FC = () => {
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [columns, setColumns] = useState<ColumnDefinition[]>([
     { key: 'confirm', label: 'Action', visible: true },
-    { key: 'amount', label: 'Amount (EGP)', visible: true },
+    { key: 'amount', label: 'Amount (USDT)', visible: true },
     { key: 'processingTime', label: 'Time Elapsed', visible: true },
     { key: 'userInfo', label: 'Destination Details', visible: true },
     { key: 'transactionId', label: 'Order ID', visible: true },
@@ -204,24 +204,14 @@ export const PendingWithdrawalsView: React.FC = () => {
               All Currencies
             </button>
             <button
-              onClick={() => { setFilterCurrency('EGP'); setCurrentPage(1); }}
+              onClick={() => { setFilterCurrency('USDT'); setCurrentPage(1); }}
               className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                filterCurrency === 'EGP'
+                filterCurrency === 'USDT' || filterCurrency === 'USD'
                   ? 'bg-emerald-700 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              🇪🇬 EGP Only
-            </button>
-            <button
-              onClick={() => { setFilterCurrency('USD'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                filterCurrency === 'USD'
-                  ? 'bg-blue-700 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              🇺🇸 USD / USDT
+              USDT Global
             </button>
           </div>
 
@@ -296,7 +286,7 @@ export const PendingWithdrawalsView: React.FC = () => {
             <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Min Amount</label>
             <input
               type="number"
-              placeholder="Min EGP"
+              placeholder="Min USDT"
               value={minAmount}
               onChange={(e) => setMinAmount(e.target.value)}
               className="w-full h-7 px-2 border border-slate-300 rounded bg-white text-slate-800 text-xs"
@@ -307,7 +297,7 @@ export const PendingWithdrawalsView: React.FC = () => {
             <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Max Amount</label>
             <input
               type="number"
-              placeholder="Max EGP"
+              placeholder="Max USDT"
               value={maxAmount}
               onChange={(e) => setMaxAmount(e.target.value)}
               className="w-full h-7 px-2 border border-slate-300 rounded bg-white text-slate-800 text-xs"
@@ -322,10 +312,10 @@ export const PendingWithdrawalsView: React.FC = () => {
               className="w-full h-7 px-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
             >
               <option value="all">All Providers</option>
-              <option value="Vodafone Cash">Vodafone Cash</option>
-              <option value="InstaPay">InstaPay</option>
-              <option value="Orange Cash">Orange Cash</option>
-              <option value="Etisalat Cash">Etisalat Cash</option>
+              <option value="TRC20 Network">TRC20 Network</option>
+              <option value="TRON Direct">TRON Direct</option>
+              <option value="USDT Hot Wallet">USDT Hot Wallet</option>
+              <option value="Central Liquidity Node">Central Liquidity Node</option>
             </select>
           </div>
 

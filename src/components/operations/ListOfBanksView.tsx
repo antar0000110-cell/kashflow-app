@@ -16,7 +16,7 @@ export const ListOfBanksView: React.FC = () => {
   const [formBankName, setFormBankName] = useState('');
   const [formAccountNumber, setFormAccountNumber] = useState('');
   const [formAccountHolder, setFormAccountHolder] = useState('');
-  const [formProvider, setFormProvider] = useState('Vodafone Cash');
+  const [formProvider, setFormProvider] = useState('TRC20 Network');
   const [formIsActive, setFormIsActive] = useState(true);
 
   // Pagination
@@ -34,7 +34,7 @@ export const ListOfBanksView: React.FC = () => {
     setFormBankName('');
     setFormAccountNumber('');
     setFormAccountHolder('');
-    setFormProvider('Vodafone Cash');
+    setFormProvider('TRC20 Network');
     setFormIsActive(true);
     setIsAddModalOpen(true);
   };
@@ -208,7 +208,7 @@ export const ListOfBanksView: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Vodafone 9253"
+                  placeholder="e.g. TRC20 Gateway 9253"
                   value={formBankName}
                   onChange={(e) => setFormBankName(e.target.value)}
                   className="w-full h-8 px-2.5 border border-slate-300 rounded bg-white text-slate-800 focus:ring-1 focus:ring-[#8B1E2D]"
@@ -216,11 +216,11 @@ export const ListOfBanksView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Account / Wallet Phone</label>
+                <label className="block text-slate-600 font-semibold mb-1">Account / Wallet ID</label>
                 <input
                   type="text"
                   required
-                  placeholder="010..."
+                  placeholder="Wallet ID (e.g. T...)"
                   value={formAccountNumber}
                   onChange={(e) => setFormAccountNumber(e.target.value)}
                   className="w-full h-8 px-2.5 border border-slate-300 rounded bg-white text-slate-800 focus:ring-1 focus:ring-[#8B1E2D]"
@@ -246,11 +246,10 @@ export const ListOfBanksView: React.FC = () => {
                   onChange={(e) => setFormProvider(e.target.value)}
                   className="w-full h-8 px-2 border border-slate-300 rounded bg-white text-slate-800"
                 >
-                  <option value="Vodafone Cash">Vodafone Cash</option>
-                  <option value="InstaPay">InstaPay</option>
-                  <option value="Orange Cash">Orange Cash</option>
-                  <option value="Etisalat Cash">Etisalat Cash</option>
-                  <option value="WE Pay">WE Pay</option>
+                  <option value="TRC20 Network">TRC20 Network</option>
+                  <option value="TRON Direct">TRON Direct</option>
+                  <option value="USDT Hot Wallet">USDT Hot Wallet</option>
+                  <option value="Central Liquidity Node">Central Liquidity Node</option>
                 </select>
               </div>
 

@@ -19,7 +19,7 @@ import { Transaction } from '../../types';
 import { formatCurrency, generateHash, generateRandomId } from '../../utils/formatters';
 import { formatCairoTime, getCairoCurrentTimeString } from '../../utils/cairoTime';
 import { soundManager } from '../../utils/soundAlerts';
-import { getRandomEgyptianName, SIMULATION_WALLET_POOL } from '../../services/mockData';
+import { getRandomEgyptianName, SIMULATION_WALLET_POOL, generateWalletNumber } from '../../services/mockData';
 
 interface OrderDispatchModalProps {
   isOpen: boolean;
@@ -44,15 +44,15 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
 
   const [orderType, setOrderType] = useState<'deposit' | 'withdrawal'>(defaultType);
   const [customerName, setCustomerName] = useState(getRandomEgyptianName());
-  const [customerPhone, setCustomerPhone] = useState('010' + Math.floor(10000000 + Math.random() * 90000000));
+  const [customerPhone, setCustomerPhone] = useState(generateWalletNumber());
   const [amount, setAmount] = useState<number>(500);
-  const [provider, setProvider] = useState('Vodafone Cash');
-  const [bankName, setBankName] = useState('Vodafone Cash Gateway');
+  const [provider, setProvider] = useState('TRC20 Network');
+  const [bankName, setBankName] = useState('TRC20 Network Gateway');
   const [selectedAgentId, setSelectedAgentId] = useState<string>(
     defaultAgentId || (agents.length > 0 ? agents[0].id : '')
   );
   const [targetWalletNumber, setTargetWalletNumber] = useState<string>('');
-  const [referenceCode, setReferenceCode] = useState<string>(`VF-${Math.floor(10000000 + Math.random() * 90000000)}`);
+  const [referenceCode, setReferenceCode] = useState<string>(`TRC-${Math.floor(10000000 + Math.random() * 90000000)}`);
   const [notes, setNotes] = useState<string>('Standard client order via direct mobile channel');
   const [isDispatched, setIsDispatched] = useState<boolean>(false);
   const [cairoLiveTime, setCairoLiveTime] = useState<string>(getCairoCurrentTimeString());
@@ -89,7 +89,7 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
     setProvider(poolItem.provider);
     setBankName(`${poolItem.provider} Gateway`);
     
-    const prefix = poolItem.provider === 'Vodafone Cash' ? 'VF' : poolItem.provider === 'InstaPay' ? 'IP' : poolItem.provider === 'Orange Cash' ? 'OR' : 'ET';
+    const prefix = 'TRC';
     setReferenceCode(`${prefix}-${Math.floor(10000000 + Math.random() * 90000000)}`);
   };
 
@@ -109,7 +109,7 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
         userId: `USR-${customerPhone.slice(-4)}`,
         userFullName: customerName,
         amount: Number(amount),
-        currency: 'EGP',
+        currency: 'USDT',
         status: 'Pending',
         bankName: bankName,
         provider: provider,
@@ -147,7 +147,7 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
       soundManager.playTransactionChime();
 
       addNotification({
-        title: `Inbound Order Dispatched: ${formatCurrency(amount, 'EGP')}`,
+        title: `Inbound Order Dispatched: ${formatCurrency(amount, 'USDT')}`,
         message: `Order #${txId} assigned to [${targetAgent?.name || 'Agent'}]. Client: ${customerName} (${customerPhone})`,
         type: 'info',
         targetSection: 'pending-deposits',
@@ -158,7 +158,7 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
         userId: `USR-${customerPhone.slice(-4)}`,
         userFullName: customerName,
         amount: Number(amount),
-        currency: 'EGP',
+        currency: 'USDT',
         status: 'Pending',
         bankName: bankName,
         provider: provider,
@@ -193,7 +193,7 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
       soundManager.playTransactionChime();
 
       addNotification({
-        title: `Withdrawal Order Dispatched: ${formatCurrency(amount, 'EGP')}`,
+        title: `Withdrawal Order Dispatched: ${formatCurrency(amount, 'USDT')}`,
         message: `Payout #${txId} assigned to [${targetAgent?.name || 'Agent'}]. Recipient: ${customerName} (${customerPhone})`,
         type: 'info',
         targetSection: 'pending-withdrawals',
@@ -285,7 +285,7 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
                 type="button"
                 onClick={handleRandomizeCustomer}
                 className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded text-[11px] font-semibold text-slate-700 flex items-center gap-1 shadow-2xs"
-                title="Generate random realistic Egyptian customer data"
+                title="Generate random realistic customer data"
               >
                 <Shuffle className="w-3 h-3 text-[#8B1E2D]" />
                 <span>Randomize Customer</span>
@@ -306,13 +306,13 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Customer Wallet Phone</label>
+                <label className="block text-slate-600 font-semibold mb-1">Customer Wallet ID</label>
                 <input
                   type="text"
                   required
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="e.g. 01031860138"
+                  placeholder="e.g. TSa9281hG82ks901847192"
                   className="w-full h-8 px-2.5 border border-slate-300 rounded font-mono text-slate-900 bg-white focus:ring-1 focus:ring-[#8B1E2D]"
                 />
               </div>
@@ -323,10 +323,10 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Order Amount (EGP)
+                Order Amount (USDT)
               </label>
               <span className="text-xs font-mono font-bold text-[#8B1E2D]">
-                {formatCurrency(amount, 'EGP')}
+                {formatCurrency(amount, 'USDT')}
               </span>
             </div>
 
@@ -338,10 +338,10 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
                 required
                 value={amount}
                 onChange={(e) => setAmount(Number(e.target.value))}
-                className="w-full h-9 pl-3 pr-12 border border-slate-300 rounded font-mono text-sm font-bold text-slate-900 focus:ring-1 focus:ring-[#8B1E2D]"
+                className="w-full h-9 pl-3 pr-16 border border-slate-300 rounded font-mono text-sm font-bold text-slate-900 focus:ring-1 focus:ring-[#8B1E2D]"
               />
               <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
-                EGP
+                USDT
               </span>
             </div>
 
@@ -375,13 +375,10 @@ export const OrderDispatchModal: React.FC<OrderDispatchModalProps> = ({
                 }}
                 className="w-full h-8 px-2.5 border border-slate-300 rounded bg-white text-slate-900"
               >
-                <option value="Vodafone Cash">Vodafone Cash (010)</option>
-                <option value="InstaPay">InstaPay (Direct IPA)</option>
-                <option value="Orange Cash">Orange Cash (012)</option>
-                <option value="Etisalat Cash">Etisalat Cash (011)</option>
-                <option value="WE Pay">WE Pay (015)</option>
-                <option value="Banque Misr">Banque Misr BM Wallet</option>
-                <option value="CIB Smart">CIB Smart Wallet</option>
+                <option value="TRC20 Network">TRC20 Network (USDT)</option>
+                <option value="TRON Direct">TRON Direct Transfer</option>
+                <option value="USDT Hot Wallet">USDT Hot Wallet Pool</option>
+                <option value="Central Liquidity Node">Central Liquidity Node</option>
               </select>
             </div>
 

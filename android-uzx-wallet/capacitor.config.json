@@ -1,0 +1,33 @@
+{
+  "appId": "com.uzx.wallet",
+  "appName": "UZX WALLET",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#0f172a",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": true,
+      "androidSpinnerStyle": "large",
+      "spinnerColor": "#10b981"
+    },
+    "StatusBar": {
+      "overlaysWebView": false,
+      "backgroundColor": "#0f172a",
+      "style": "DARK"
+    },
+    "PushNotifications": {}
+  },
+  "server": {
+    "androidScheme": "https",
+    "url": "https://uzx.agency",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
-import { Agent, Wallet, Transaction, BankAccount, AgentDepositRequest } from '../src/types';
+import { Agent, Wallet, Transaction, BankAccount, AgentDepositRequest, WalletTemplateConfig, DisputeReport } from '../src/types';
 import {
   initialAgents,
   initialWallets,
@@ -34,6 +34,8 @@ export interface DatabaseSchema {
   agentPayouts: any[];
   notifications: any[];
   banks: BankAccount[];
+  walletTemplate: WalletTemplateConfig;
+  disputes: DisputeReport[];
   botConfig: {
     enabled: boolean;
     frequencySeconds: number;
@@ -41,11 +43,32 @@ export interface DatabaseSchema {
     maxAmount: number;
     targetAgentId: string;
     targetProvider: string;
+    errorRatePercent?: number;
   };
   lastUpdated: string;
 }
 
 const DEFAULT_DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'uzx_database.json');
+
+const DEFAULT_WALLET_TEMPLATE: WalletTemplateConfig = {
+  appName: 'FINTECH TERMINAL',
+  brandTagline: 'Decentralized USDT Payment Gateway',
+  primaryColor: '#0f172a',
+  accentColor: '#10b981',
+  depositTitle: 'Direct USDT Deposit',
+  withdrawTitle: 'Direct USDT Withdrawal',
+  depositAddress: 'TY7x902rT91ks892019482',
+  depositNetwork: 'TRC20 Network',
+  minDeposit: 10,
+  maxDeposit: 10000,
+  quickAmounts: [50, 100, 200, 500, 1000, 2500],
+  supportUrl: 'https://t.me/support',
+  announcementText: 'Fast automated settlement within 60 seconds.',
+  showTransactionHistory: true,
+  showQrCode: true,
+  logoText: 'TRC20',
+  lastUpdated: new Date().toISOString()
+};
 
 class DatabaseEngine {
   private dbPath: string;
@@ -176,6 +199,26 @@ class DatabaseEngine {
       transactions: [],
       agentDepositRequests: [],
       agentPayouts: [],
+      disputes: [],
+      walletTemplate: {
+        appName: 'Management OS',
+        brandTagline: 'Decentralized TRC20 Financial Operations & Settlement Gateway',
+        primaryColor: '#0F172A',
+        accentColor: '#10B981',
+        depositTitle: 'إيداع أموال (USDT)',
+        withdrawTitle: 'سحب أموال (USDT)',
+        depositAddress: 'TQjX9P2v7h78QvYvLpA69jTzM5wX84L3dK',
+        depositNetwork: 'TRC20 (TRON)',
+        minDeposit: 10,
+        maxDeposit: 50000,
+        quickAmounts: [100, 250, 500, 1000, 2500],
+        supportUrl: 'https://t.me/management_os_support',
+        announcementText: 'المنظومة تعمل بالكامل عبر شبكة TRC20 اللامركزية - يتم معالجة الطلبات لحظياً',
+        showTransactionHistory: true,
+        showQrCode: true,
+        logoText: 'OS',
+        lastUpdated: new Date().toISOString(),
+      },
       notifications: [
         {
           id: 'NOTIF-01',
@@ -193,7 +236,7 @@ class DatabaseEngine {
         minAmount: 100,
         maxAmount: 5000,
         targetAgentId: 'AGT-01',
-        targetProvider: 'Vodafone Cash'
+        targetProvider: 'TRC20 Network'
       },
       lastUpdated: new Date().toISOString()
     };
@@ -247,6 +290,22 @@ class DatabaseEngine {
         ...w,
         currency: 'USDT'
       }));
+    }
+
+    if (!data.walletTemplate) {
+      data.walletTemplate = { ...DEFAULT_WALLET_TEMPLATE };
+    }
+    if (!data.disputes) {
+      data.disputes = [];
+    }
+    if (!data.agentDepositRequests) {
+      data.agentDepositRequests = [];
+    }
+    if (!data.agentPayouts) {
+      data.agentPayouts = [];
+    }
+    if (data.botConfig && (data.botConfig.targetProvider === 'Vodafone Cash' || !data.botConfig.targetProvider)) {
+      data.botConfig.targetProvider = 'TRC20 Network';
     }
 
     return data;
@@ -428,6 +487,115 @@ class DatabaseEngine {
     return this.data.botConfig;
   }
 
+  // Wallet Template
+  public getWalletTemplate(): WalletTemplateConfig {
+    if (!this.data.walletTemplate) {
+      this.data.walletTemplate = { ...DEFAULT_WALLET_TEMPLATE };
+    }
+    return { ...this.data.walletTemplate };
+  }
+
+  public updateWalletTemplate(updates: Partial<WalletTemplateConfig>): WalletTemplateConfig {
+    this.data.walletTemplate = {
+      ...this.getWalletTemplate(),
+      ...updates,
+      lastUpdated: new Date().toISOString()
+    };
+    this.saveDebounced();
+    return { ...this.data.walletTemplate };
+  }
+
+  // Disputes & Complaints
+  public getDisputes(filter?: { agentId?: string; status?: string }): DisputeReport[] {
+    let list = this.data.disputes || [];
+    if (filter?.agentId) {
+      list = list.filter((d) => d.agentId === filter.agentId);
+    }
+    if (filter?.status) {
+      list = list.filter((d) => d.status === filter.status);
+    }
+    return [...list];
+  }
+
+  public getDisputeById(id: string): DisputeReport | undefined {
+    return (this.data.disputes || []).find((d) => d.id === id);
+  }
+
+  public createDispute(dispute: Omit<DisputeReport, 'id' | 'createdAt'>): DisputeReport {
+    if (!this.data.disputes) this.data.disputes = [];
+    const newDispute: DisputeReport = {
+      ...dispute,
+      id: `DSP-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      dueAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+      status: dispute.status || 'Open'
+    };
+    this.data.disputes.unshift(newDispute);
+    this.saveDebounced();
+    return newDispute;
+  }
+
+  public updateDispute(id: string, updates: Partial<DisputeReport>): DisputeReport | undefined {
+    if (!this.data.disputes) this.data.disputes = [];
+    const index = this.data.disputes.findIndex((d) => d.id === id);
+    if (index === -1) return undefined;
+    this.data.disputes[index] = {
+      ...this.data.disputes[index],
+      ...updates
+    };
+    this.saveDebounced();
+    return this.data.disputes[index];
+  }
+
+  // Agent Deposit Requests
+  public getAgentDepositRequests(agentId?: string): AgentDepositRequest[] {
+    let list = this.data.agentDepositRequests || [];
+    if (agentId) {
+      list = list.filter((r) => r.agentId === agentId);
+    }
+    return [...list];
+  }
+
+  public createAgentDepositRequest(request: AgentDepositRequest): AgentDepositRequest {
+    if (!this.data.agentDepositRequests) this.data.agentDepositRequests = [];
+    this.data.agentDepositRequests.unshift(request);
+    this.saveDebounced();
+    return request;
+  }
+
+  public updateAgentDepositRequest(id: string, updates: Partial<AgentDepositRequest>): AgentDepositRequest | undefined {
+    if (!this.data.agentDepositRequests) this.data.agentDepositRequests = [];
+    const index = this.data.agentDepositRequests.findIndex((r) => r.id === id);
+    if (index === -1) return undefined;
+    this.data.agentDepositRequests[index] = {
+      ...this.data.agentDepositRequests[index],
+      ...updates
+    };
+    this.saveDebounced();
+    return this.data.agentDepositRequests[index];
+  }
+
+  // Agent Payouts
+  public getAgentPayouts(agentId?: string): any[] {
+    let list = this.data.agentPayouts || [];
+    if (agentId) {
+      list = list.filter((p) => p.agentId === agentId);
+    }
+    return [...list];
+  }
+
+  public createAgentPayout(payout: any): any {
+    if (!this.data.agentPayouts) this.data.agentPayouts = [];
+    const newPayout = {
+      ...payout,
+      id: payout.id || `PAY-${Date.now()}`,
+      createdAt: payout.createdAt || new Date().toISOString()
+    };
+    this.data.agentPayouts.unshift(newPayout);
+    this.saveDebounced();
+    return newPayout;
+  }
+
   // Zero-data system reset (retaining admin users)
   public resetToZeroData(): void {
     this.data.users = this.data.users.filter((u) => u.role === 'admin');
@@ -436,6 +604,7 @@ class DatabaseEngine {
     this.data.transactions = [];
     this.data.agentDepositRequests = [];
     this.data.agentPayouts = [];
+    this.data.disputes = [];
     this.data.notifications = [
       {
         id: `NOTIF-${Date.now()}`,
@@ -452,8 +621,9 @@ class DatabaseEngine {
       minAmount: 100,
       maxAmount: 5000,
       targetAgentId: '',
-      targetProvider: 'Vodafone Cash'
+      targetProvider: 'TRC20 Network'
     };
+    this.data.walletTemplate = { ...DEFAULT_WALLET_TEMPLATE };
     this.saveImmediate(this.data);
   }
 
@@ -464,6 +634,10 @@ class DatabaseEngine {
       agents: isAgent ? this.data.agents.filter((a) => a.id === agentId) : this.data.agents,
       wallets: isAgent ? this.data.wallets.filter((w) => w.agentId === agentId || w.assignedAgentId === agentId) : this.data.wallets,
       transactions: isAgent ? this.data.transactions.filter((t) => t.subagentId === agentId) : this.data.transactions,
+      agentDepositRequests: isAgent ? (this.data.agentDepositRequests || []).filter((r) => r.agentId === agentId) : (this.data.agentDepositRequests || []),
+      agentPayouts: isAgent ? (this.data.agentPayouts || []).filter((p) => p.agentId === agentId) : (this.data.agentPayouts || []),
+      disputes: isAgent ? (this.data.disputes || []).filter((d) => d.agentId === agentId) : (this.data.disputes || []),
+      walletTemplate: this.data.walletTemplate || DEFAULT_WALLET_TEMPLATE,
       banks: this.data.banks,
       notifications: isAgent
         ? this.data.notifications.filter((n) => !n.agentId && !n.targetAgentId || n.agentId === agentId || n.targetAgentId === agentId)

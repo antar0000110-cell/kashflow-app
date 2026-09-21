@@ -98,7 +98,7 @@ export const PendingDepositsView: React.FC = () => {
   const [isColumnSettingsOpen, setIsColumnSettingsOpen] = useState(false);
   const [columns, setColumns] = useState<ColumnDefinition[]>([
     { key: 'confirm', label: 'Action', visible: true },
-    { key: 'amount', label: 'Amount (EGP)', visible: true },
+    { key: 'amount', label: 'Amount (USDT)', visible: true },
     { key: 'processingTime', label: 'Time Elapsed', visible: true },
     { key: 'userInfo', label: 'Client / Sender Info', visible: true },
     { key: 'transactionId', label: 'Order ID', visible: true },
@@ -250,24 +250,14 @@ export const PendingDepositsView: React.FC = () => {
               All Currencies
             </button>
             <button
-              onClick={() => { setFilterCurrency('EGP'); setCurrentPage(1); }}
+              onClick={() => { setFilterCurrency('USDT'); setCurrentPage(1); }}
               className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                filterCurrency === 'EGP'
+                filterCurrency === 'USDT' || filterCurrency === 'USD'
                   ? 'bg-emerald-700 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              🇪🇬 EGP Only
-            </button>
-            <button
-              onClick={() => { setFilterCurrency('USD'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                filterCurrency === 'USD'
-                  ? 'bg-blue-700 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              🇺🇸 USD / USDT
+              USDT Global
             </button>
           </div>
 
@@ -347,10 +337,10 @@ export const PendingDepositsView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Phone / Sender</label>
+            <label className="block text-slate-500 text-[10px] uppercase font-semibold mb-1">Wallet ID / Sender</label>
             <input
               type="text"
-              placeholder="010..."
+              placeholder="Wallet ID..."
               value={filterUserInfo}
               onChange={(e) => setFilterUserInfo(e.target.value)}
               className="w-full h-7 px-2 border border-slate-300 rounded bg-white text-slate-800 text-xs focus:ring-1 focus:ring-[#8B1E2D]"
@@ -365,10 +355,10 @@ export const PendingDepositsView: React.FC = () => {
               className="w-full h-7 px-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs focus:ring-1 focus:ring-[#8B1E2D]"
             >
               <option value="all">All Providers</option>
-              <option value="Vodafone Cash">Vodafone Cash</option>
-              <option value="InstaPay">InstaPay</option>
-              <option value="Orange Cash">Orange Cash</option>
-              <option value="Etisalat Cash">Etisalat Cash</option>
+              <option value="TRC20 Network">TRC20 Network</option>
+              <option value="TRON Direct">TRON Direct</option>
+              <option value="USDT Hot Wallet">USDT Hot Wallet</option>
+              <option value="Central Liquidity Node">Central Liquidity Node</option>
             </select>
           </div>
 
@@ -445,7 +435,7 @@ export const PendingDepositsView: React.FC = () => {
               className="w-full h-7 px-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs focus:ring-1 focus:ring-[#8B1E2D]"
             >
               <option value="all">All</option>
-              <option value="EGP">EGP</option>
+              <option value="USDT">USDT</option>
               <option value="USD">USD</option>
             </select>
           </div>
@@ -689,13 +679,13 @@ export const PendingDepositsView: React.FC = () => {
 
             <div className="bg-slate-50 p-2.5 rounded border border-slate-200 text-[11px] font-mono space-y-1">
               <div>Sender: {selectedTxForConfirm.userFullName}</div>
-              <div>Phone: {selectedTxForConfirm.phone || '-'}</div>
+              <div>Wallet ID: {selectedTxForConfirm.phone || '-'}</div>
               <div>Gateway: {selectedTxForConfirm.bankName}</div>
             </div>
 
             <div>
               <label className="block text-slate-700 font-semibold text-xs mb-1">
-                Approved Deposit Amount ({selectedTxForConfirm.currency || 'EGP'}):
+                Approved Deposit Amount ({selectedTxForConfirm.currency || 'USDT'}):
               </label>
               <input
                 type="number"

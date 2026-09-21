@@ -40,7 +40,12 @@ export function generateRandomId(prefix: string = '', length: number = 6): strin
 }
 
 export function generateWalletNumber(): string {
-  return '010' + Math.floor(10000000 + Math.random() * 90000000).toString();
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = 'T';
+  for (let i = 0; i < 33; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
 export function generateOtpCode(): string {
@@ -127,7 +132,7 @@ export function sha256(str: string): string {
  */
 export function generateTimeBasedOtp(walletNumber: string): string {
   if (!walletNumber) return '123456';
-  const cleanNum = walletNumber.replace(/\D/g, '');
+  const cleanNum = walletNumber.trim();
   
   // Rotating time-block (300,000 milliseconds = 5 minutes)
   const timeBlock = Math.floor(Date.now() / 300000);

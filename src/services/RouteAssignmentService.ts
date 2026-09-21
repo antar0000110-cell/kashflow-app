@@ -84,10 +84,10 @@ export class RouteAssignmentService {
       if (w.provider) providersSet.add(w.provider);
     });
 
-    // Default Egyptian cash providers if none explicitly set
+    // Default providers if none explicitly set
     if (providersSet.size === 0) {
-      providersSet.add('Vodafone Cash');
-      providersSet.add('InstaPay');
+      providersSet.add('TRC20 Network');
+      providersSet.add('TRON Direct');
     }
 
     const speedMultiplier =
@@ -165,7 +165,7 @@ export class RouteAssignmentService {
           todayProcessedCount: 0,
           todayAssignedOrders: 0,
           todayAssignedVolumeUSDT: 0,
-          depositPaymentMethod: 'Vodafone Cash',
+          depositPaymentMethod: 'TRC20 Network',
           depositPaymentAddress: '',
           assignedWalletCount: 0,
           assignedWalletIds: [],
@@ -173,7 +173,7 @@ export class RouteAssignmentService {
         },
         queue: [],
         linkedWallets: [],
-        supportedProviders: ['Vodafone Cash', 'InstaPay'],
+        supportedProviders: ['TRC20 Network', 'TRON Direct'],
         speedMultiplier: 1.0,
         linkedAt: new Date().toISOString(),
         lastEvaluatedAt: new Date().toISOString(),
@@ -411,7 +411,7 @@ export class RouteAssignmentService {
       }
 
       const binding = this.agentQueues.get(agent.id);
-      const supportedProviders = binding?.supportedProviders || [agent.depositPaymentMethod || 'Vodafone Cash'];
+      const supportedProviders = binding?.supportedProviders || [agent.depositPaymentMethod || 'TRC20 Network'];
 
       return {
         agentId: agent.id,

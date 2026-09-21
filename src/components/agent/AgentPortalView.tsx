@@ -57,6 +57,7 @@ export const AgentPortalView: React.FC = () => {
     transferBetweenWallets,
     paymentMethods,
     agentPayouts,
+    requestAgentPayout,
   } = useAppStore();
 
   // STRICTLY LOCKED TO AUTHENTICATED AGENT (NO SWITCHER)
@@ -64,6 +65,13 @@ export const AgentPortalView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'assigned_tasks' | 'inbound_deposits' | 'deposit_history' | 'inbound_withdrawals' | 'withdrawal_history' | 'wallets' | 'payouts'>('assigned_tasks');
   const [assignedTasksFilter, setAssignedTasksFilter] = useState<'all' | 'direct' | 'deposits' | 'withdrawals' | 'broadcasts'>('all');
+
+  // TRC20 Payout Request Form State
+  const [trc20PayoutAddress, setTrc20PayoutAddress] = useState('');
+  const [trc20PayoutAmount, setTrc20PayoutAmount] = useState<number | ''>('');
+  const [trc20PayoutNotes, setTrc20PayoutNotes] = useState('');
+  const [payoutStatusBanner, setPayoutStatusBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
 
   // Real-time Event-Driven Scoped Notification Handler
   const [liveAssignedAlert, setLiveAssignedAlert] = useState<{
@@ -144,7 +152,7 @@ export const AgentPortalView: React.FC = () => {
   const [isDepositTopupModalOpen, setIsDepositTopupModalOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [topupAmount, setTopupAmount] = useState<number>(10000);
-  const [topupMethod, setTopupMethod] = useState(paymentMethods[0] || 'Vodafone Cash');
+  const [topupMethod, setTopupMethod] = useState(paymentMethods[0] || 'TRC20 Network');
   const [topupRef, setTopupRef] = useState('');
   const [topupNote, setTopupNote] = useState('Transferred to Master Gateway');
 
@@ -330,7 +338,7 @@ export const AgentPortalView: React.FC = () => {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
               <div className="text-xs font-bold font-mono text-emerald-900 truncate">
-                +{formatCurrency(totalEarnedCommission, currentAgent.currency || 'EGP')}
+                +{formatCurrency(totalEarnedCommission, currentAgent.currency || 'USDT')}
               </div>
             </div>
           </div>
@@ -376,7 +384,7 @@ export const AgentPortalView: React.FC = () => {
               </div>
             </div>
             <div className="text-sm sm:text-lg lg:text-xl font-bold font-mono text-[#8B1E2D] truncate tracking-tight">
-              {formatCurrency(currentAgent.insuranceDeposit, currentAgent.currency || 'EGP')}
+              {formatCurrency(currentAgent.insuranceDeposit, currentAgent.currency || 'USDT')}
             </div>
           </div>
           <button
@@ -397,12 +405,12 @@ export const AgentPortalView: React.FC = () => {
               </div>
             </div>
             <div className="text-sm sm:text-lg lg:text-xl font-bold font-mono text-emerald-700 truncate tracking-tight">
-              +{formatCurrency(currentAgent.profitBalance || 0, currentAgent.currency || 'EGP')}
+              +{formatCurrency(currentAgent.profitBalance || 0, currentAgent.currency || 'USDT')}
             </div>
           </div>
           <div className="text-[10px] sm:text-[11px] text-emerald-600 font-medium mt-2 truncate flex items-center gap-1">
             <span>Lifetime:</span>
-            <span className="font-bold font-mono">+{formatCurrency(currentAgent.totalEarnedCommission || currentAgent.profitBalance || 0, currentAgent.currency || 'EGP')}</span>
+            <span className="font-bold font-mono">+{formatCurrency(currentAgent.totalEarnedCommission || currentAgent.profitBalance || 0, currentAgent.currency || 'USDT')}</span>
           </div>
         </div>
 
@@ -422,7 +430,7 @@ export const AgentPortalView: React.FC = () => {
             </div>
           </div>
           <div className="text-[10px] sm:text-[11px] text-slate-500 mt-2 truncate">
-            Currency: <strong className="text-slate-800 font-mono">{currentAgent.currency || 'EGP'}</strong>
+            Currency: <strong className="text-slate-800 font-mono">{currentAgent.currency || 'USDT'}</strong>
           </div>
         </div>
 
@@ -436,7 +444,7 @@ export const AgentPortalView: React.FC = () => {
               </div>
             </div>
             <div className="text-sm sm:text-lg lg:text-xl font-bold font-mono text-slate-900 truncate tracking-tight">
-              {formatCurrency(currentAgent.todayAssignedVolumeUSDT || currentAgent.processedVolume || 0, currentAgent.currency || 'EGP')}
+              {formatCurrency(currentAgent.todayAssignedVolumeUSDT || currentAgent.processedVolume || 0, currentAgent.currency || 'USDT')}
             </div>
           </div>
           <div className="text-[10px] sm:text-[11px] text-slate-500 mt-2 truncate">
@@ -613,7 +621,7 @@ export const AgentPortalView: React.FC = () => {
                     </div>
                     <div className="text-[11px] text-rose-200 mt-0.5">
                       {liveAssignedAlert.type === 'deposit' ? 'Cash-In Deposit' : 'Cash-Out Payout'}:{' '}
-                      <strong>{formatCurrency(liveAssignedAlert.amount, currentAgent.currency || 'EGP')}</strong>{' '}
+                      <strong>{formatCurrency(liveAssignedAlert.amount, currentAgent.currency || 'USDT')}</strong>{' '}
                       • Received at {liveAssignedAlert.time}
                     </div>
                   </div>
@@ -792,7 +800,7 @@ export const AgentPortalView: React.FC = () => {
                               <div className="pt-1 flex items-center gap-2">
                                 <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                                   <span>💰 Expected Profit (الربح المتوقع):</span>
-                                  <strong className="font-bold">+{formatCurrency((tx.amount * (isDep ? depCommPercent : wdlCommPercent)) / 100, currentAgent.currency || 'EGP')}</strong>
+                                  <strong className="font-bold">+{formatCurrency((tx.amount * (isDep ? depCommPercent : wdlCommPercent)) / 100, currentAgent.currency || 'USDT')}</strong>
                                   <span className="text-slate-500">({isDep ? depCommPercent : wdlCommPercent}%)</span>
                                 </span>
                               </div>
@@ -802,7 +810,7 @@ export const AgentPortalView: React.FC = () => {
                               <button
                                 onClick={() => handleCopy(tx.phone || tx.targetWalletId || tx.userInfo)}
                                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 border border-slate-300 transition-colors cursor-pointer"
-                                title="Copy Client/Wallet Phone"
+                                title="Copy Client/Wallet ID"
                               >
                                 {copiedText === (tx.phone || tx.targetWalletId || tx.userInfo) ? (
                                   <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -1140,7 +1148,7 @@ export const AgentPortalView: React.FC = () => {
                       <div className="space-y-1 text-left">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono font-bold text-sm text-emerald-800">
-                            {formatCurrency(tx.amount, tx.currency || currentAgent.currency || 'EGP')}
+                            {formatCurrency(tx.amount, tx.currency || currentAgent.currency || 'USDT')}
                           </span>
                           <span className="font-mono text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
                             {tx.id}
@@ -1163,7 +1171,7 @@ export const AgentPortalView: React.FC = () => {
 
                       <div className="text-left sm:text-right font-mono text-[11px] space-y-0.5 shrink-0">
                         <div className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          +Earned: {formatCurrency((tx.amount * depCommPercent) / 100, currentAgent.currency || 'EGP')} ({depCommPercent}%)
+                          +Earned: {formatCurrency((tx.amount * depCommPercent) / 100, currentAgent.currency || 'USDT')} ({depCommPercent}%)
                         </div>
                         <div className="text-slate-400 text-[10px]">
                           Processed: {tx.processedAt ? formatCairoTime(tx.processedAt) : tx.dateOfCreation}
@@ -1224,7 +1232,7 @@ export const AgentPortalView: React.FC = () => {
                       <div className="space-y-1 text-left">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono font-bold text-sm text-amber-800">
-                            {formatCurrency(tx.amount, tx.currency || currentAgent.currency || 'EGP')}
+                            {formatCurrency(tx.amount, tx.currency || currentAgent.currency || 'USDT')}
                           </span>
                           <span className="font-mono text-slate-500 font-semibold bg-amber-50 px-1.5 py-0.5 rounded text-[11px] border border-amber-200">
                             {tx.id}
@@ -1247,7 +1255,7 @@ export const AgentPortalView: React.FC = () => {
 
                       <div className="text-left sm:text-right font-mono text-[11px] space-y-0.5 shrink-0">
                         <div className="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                          +Earned: {formatCurrency((tx.amount * wdlCommPercent) / 100, currentAgent.currency || 'EGP')} ({wdlCommPercent}%)
+                          +Earned: {formatCurrency((tx.amount * wdlCommPercent) / 100, currentAgent.currency || 'USDT')} ({wdlCommPercent}%)
                         </div>
                         <div className="text-slate-400 text-[10px]">
                           Processed: {tx.processedAt ? formatCairoTime(tx.processedAt) : tx.dateOfCreation}
@@ -1274,7 +1282,7 @@ export const AgentPortalView: React.FC = () => {
 
                 <div className="text-xs text-slate-600 flex justify-between font-mono">
                   <span>Balance:</span>
-                  <span className="font-bold text-[#8B1E2D]">{formatCurrency(w.balance, 'EGP')}</span>
+                  <span className="font-bold text-[#8B1E2D]">{formatCurrency(w.balance, 'USDT')}</span>
                 </div>
 
                 <div className="text-[11px] text-slate-500 font-mono flex justify-between">
@@ -1294,41 +1302,176 @@ export const AgentPortalView: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 5: Settled Commissions & Payouts Received */}
+        {/* Tab 5: Settled Commissions & TRC20 Payout Requests */}
         {activeTab === 'payouts' && (
           <div className="p-3 sm:p-4 space-y-4">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left">
+            {/* Header / Summary Card */}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-left">
               <div>
                 <h4 className="font-bold text-sm text-emerald-950 flex items-center justify-start gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Agency Earnings &amp; Commission Ledger</span>
+                  <span>Agent Profits & TRC20 Payout Hub</span>
                 </h4>
                 <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
-                  Commissions on deposits ({depCommPercent}%) and cash-outs ({wdlCommPercent}%) are settled automatically and credited directly to your account.
+                  Earn automated commissions on deposits ({depCommPercent}%) and cash-outs ({wdlCommPercent}%). Request automated USDT (TRC20) disbursements directly to your personal crypto wallet.
                 </p>
               </div>
 
-              <div className="bg-white px-4 py-2 rounded-xl border border-emerald-300 text-left font-mono shrink-0 shadow-2xs">
-                <div className="text-[10px] text-slate-500 uppercase">Total Settled Commissions</div>
-                <div className="text-lg font-bold text-emerald-700">
-                  {formatCurrency(
-                    agentPayouts
-                      .filter((p) => p.agentId === currentAgent.id)
-                      .reduce((acc, p) => acc + p.amount, 0),
-                    currentAgent.currency || 'EGP'
-                  )}
+              <div className="flex items-center gap-3">
+                <div className="bg-white px-4 py-2 rounded-xl border border-emerald-300 text-left font-mono shrink-0 shadow-2xs">
+                  <div className="text-[10px] text-slate-500 uppercase">Available Profit Balance</div>
+                  <div className="text-lg font-black text-emerald-700">
+                    {formatCurrency(currentAgent.profitBalance || 0, currentAgent.currency || 'USDT')}
+                  </div>
+                </div>
+
+                <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 text-left font-mono shrink-0 shadow-2xs">
+                  <div className="text-[10px] text-slate-500 uppercase">Total Settled</div>
+                  <div className="text-lg font-bold text-slate-800">
+                    {formatCurrency(
+                      agentPayouts
+                        .filter((p) => p.agentId === currentAgent.id && p.status === 'Approved')
+                        .reduce((acc, p) => acc + p.amount, 0),
+                      currentAgent.currency || 'USDT'
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <div className="bg-slate-100/80 p-2.5 px-3 border-b border-slate-200 font-bold text-xs text-slate-800 text-left">
-                Settled Commission Payouts from Administration
+            {/* Payout Status Banner */}
+            {payoutStatusBanner && (
+              <div
+                className={`p-3 rounded-xl text-xs font-semibold flex items-center justify-between border ${
+                  payoutStatusBanner.type === 'success'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                    : 'bg-rose-50 border-rose-300 text-rose-900'
+                }`}
+              >
+                <span>{payoutStatusBanner.text}</span>
+                <button
+                  onClick={() => setPayoutStatusBanner(null)}
+                  className="p-1 hover:opacity-75 cursor-pointer text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Automated Payout Request Form */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs text-left space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <h5 className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  <span>Request Automated TRC20 Commission Payout</span>
+                </h5>
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
+                  Network: USDT (TRC20)
+                </span>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!trc20PayoutAmount || Number(trc20PayoutAmount) <= 0) {
+                    setPayoutStatusBanner({ type: 'error', text: 'Please enter a valid payout amount.' });
+                    return;
+                  }
+                  if (Number(trc20PayoutAmount) > (currentAgent.profitBalance || 0)) {
+                    setPayoutStatusBanner({
+                      type: 'error',
+                      text: `Requested amount exceeds your available profit balance of ${currentAgent.profitBalance || 0} USDT.`,
+                    });
+                    return;
+                  }
+                  if (!trc20PayoutAddress.trim()) {
+                    setPayoutStatusBanner({ type: 'error', text: 'Please provide a valid USDT TRC20 address.' });
+                    return;
+                  }
+
+                  const res = requestAgentPayout(
+                    currentAgent.id,
+                    Number(trc20PayoutAmount),
+                    trc20PayoutAddress.trim(),
+                    trc20PayoutNotes.trim() || 'Agent Commission Disbursement'
+                  );
+
+                  if (res.success) {
+                    setPayoutStatusBanner({
+                      type: 'success',
+                      text: 'Payout request dispatched successfully! Awaiting Admin confirmation and Blockchain TxID.',
+                    });
+                    setTrc20PayoutAmount('');
+                    setTrc20PayoutNotes('');
+                  } else {
+                    setPayoutStatusBanner({ type: 'error', text: res.message });
+                  }
+                }}
+                className="grid grid-cols-1 md:grid-cols-12 gap-3"
+              >
+                {/* Amount */}
+                <div className="md:col-span-4 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-slate-700">Requested Amount (USDT)</label>
+                    <button
+                      type="button"
+                      onClick={() => setTrc20PayoutAmount(currentAgent.profitBalance || 0)}
+                      className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Max ({currentAgent.profitBalance || 0})
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    max={currentAgent.profitBalance || 0}
+                    value={trc20PayoutAmount}
+                    onChange={(e) => setTrc20PayoutAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="e.g. 250"
+                    required
+                    className="w-full h-10 px-3 border border-slate-300 rounded-xl font-mono text-xs focus:border-emerald-600 outline-none"
+                  />
+                </div>
+
+                {/* TRC20 Address */}
+                <div className="md:col-span-5 space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-700">Recipient USDT TRC20 Address</label>
+                  <input
+                    type="text"
+                    value={trc20PayoutAddress}
+                    onChange={(e) => setTrc20PayoutAddress(e.target.value)}
+                    placeholder="T..."
+                    required
+                    className="w-full h-10 px-3 border border-slate-300 rounded-xl font-mono text-xs focus:border-emerald-600 outline-none"
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <div className="md:col-span-3 flex items-end">
+                  <button
+                    type="submit"
+                    disabled={!trc20PayoutAmount || Number(trc20PayoutAmount) <= 0 || (currentAgent.profitBalance || 0) <= 0}
+                    className="w-full h-10 bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span>Submit Request</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Payouts Ledger Table */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+              <div className="bg-slate-50 p-3 border-b border-slate-200 font-bold text-xs text-slate-800 text-left flex items-center justify-between">
+                <span>Disbursement Requests & Commission Settlements</span>
+                <span className="text-[10px] text-slate-500 font-mono">
+                  {agentPayouts.filter((p) => p.agentId === currentAgent.id).length} Records
+                </span>
               </div>
               <div className="divide-y divide-slate-100">
                 {agentPayouts.filter((p) => p.agentId === currentAgent.id).length === 0 ? (
                   <div className="p-8 text-center text-xs text-slate-400">
-                    No historical payouts recorded yet. Disbursements appear here instantly upon administrative approval.
+                    No historical payouts recorded yet. Submitted disbursement requests will appear here with live updates.
                   </div>
                 ) : (
                   agentPayouts
@@ -1336,27 +1479,67 @@ export const AgentPortalView: React.FC = () => {
                     .map((p) => (
                       <div
                         key={p.id}
-                        className="p-3 hover:bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                        className={`p-3.5 hover:bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors ${
+                          p.status === 'Pending' ? 'bg-amber-50/40' : ''
+                        }`}
                       >
                         <div className="space-y-1 text-left">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-emerald-700 text-sm">
-                              +{formatCurrency(p.amount, p.currency || 'EGP')}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono font-bold text-emerald-800 text-sm">
+                              {p.amount.toLocaleString()} USDT
                             </span>
-                            <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-mono text-[10px] font-bold">
-                              {p.paymentMethod}
+                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded font-mono text-[10px] font-bold">
+                              {p.id}
                             </span>
+                            {/* Live Status Badge */}
+                            {p.status === 'Pending' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full font-bold text-[10px] border border-amber-200 animate-pulse">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                <span>Awaiting Admin Payment</span>
+                              </span>
+                            ) : p.status === 'Approved' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px] border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                <span>Paid / Confirmed</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-100 text-rose-800 rounded-full font-bold text-[10px] border border-rose-200">
+                                <XCircle className="w-3 h-3 text-rose-600" />
+                                <span>Rejected</span>
+                              </span>
+                            )}
                           </div>
-                          <div className="text-slate-600 text-[11px] flex flex-wrap items-center gap-2">
-                            <span>Ref: <strong className="font-mono">{p.referenceNumber}</strong></span>
-                            <span>•</span>
-                            <span>{p.notes || 'Routine commission settlement'}</span>
+
+                          <div className="text-slate-600 text-[11px] font-mono flex flex-wrap items-center gap-2">
+                            <span>TRC20: <strong className="text-slate-800">{p.payoutAddress || 'Standard Agency Wallet'}</strong></span>
+                            {p.notes && <span>• {p.notes}</span>}
                           </div>
+
+                          {/* TxHash display for confirmed payouts */}
+                          {p.txHash && (
+                            <div className="flex items-center gap-1.5 text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 w-fit">
+                              <span className="text-slate-500">TxID:</span>
+                              <span className="font-bold truncate max-w-[200px]">{p.txHash}</span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(p.txHash!);
+                                  setCopiedTxId(p.id);
+                                  setTimeout(() => setCopiedTxId(null), 2000);
+                                }}
+                                className="p-0.5 hover:bg-emerald-200 rounded cursor-pointer"
+                                title="Copy TxHash"
+                              >
+                                {copiedTxId === p.id ? <Check className="w-3 h-3 text-emerald-800" /> : <Copy className="w-3 h-3 text-emerald-600" />}
+                              </button>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="text-left sm:text-right font-mono text-[11px] text-slate-400">
+                        <div className="text-left sm:text-right font-mono text-[11px] text-slate-400 space-y-0.5 shrink-0">
                           <div>{p.createdAt}</div>
-                          <div className="text-emerald-600 font-bold">Credited</div>
+                          {p.processedBy && (
+                            <div className="text-[10px] text-slate-500">By: {p.processedBy}</div>
+                          )}
                         </div>
                       </div>
                     ))
@@ -1419,7 +1602,7 @@ export const AgentPortalView: React.FC = () => {
                 {/* Profit Credit Notice */}
                 <div className="mt-2.5 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-[11px] flex items-center justify-between font-mono">
                   <span>✨ Profit to be credited ({depCommPercent}%):</span>
-                  <span className="font-bold">+{formatCurrency((Number(depositApprovedAmount || 0) * depCommPercent) / 100, currentAgent.currency || 'EGP')}</span>
+                  <span className="font-bold">+{formatCurrency((Number(depositApprovedAmount || 0) * depCommPercent) / 100, currentAgent.currency || 'USDT')}</span>
                 </div>
               </div>
 
@@ -1478,7 +1661,7 @@ export const AgentPortalView: React.FC = () => {
             {/* Profit Credit Notice for Withdrawal */}
             <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-[11px] flex items-center justify-between font-mono">
               <span>✨ Profit to be credited ({wdlCommPercent}%):</span>
-              <span className="font-bold">+{formatCurrency((selectedWithdrawalForConfirm.amount * wdlCommPercent) / 100, currentAgent.currency || 'EGP')}</span>
+              <span className="font-bold">+{formatCurrency((selectedWithdrawalForConfirm.amount * wdlCommPercent) / 100, currentAgent.currency || 'USDT')}</span>
             </div>
 
             <div className="p-2.5 bg-slate-50 rounded-xl text-[11px] text-slate-500 leading-relaxed">
@@ -1570,7 +1753,7 @@ export const AgentPortalView: React.FC = () => {
 
             <form onSubmit={handleSendTopupRequest} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Requested Amount ({currentAgent.currency || 'EGP'})</label>
+                <label className="block text-slate-600 font-semibold mb-1">Requested Amount ({currentAgent.currency || 'USDT'})</label>
                 <input
                   type="number"
                   required
@@ -1696,7 +1879,7 @@ export const AgentPortalView: React.FC = () => {
                 >
                   {agentAssignedWallets.map((w) => (
                     <option key={w.id} value={w.id}>
-                      {w.phoneNumber} ({formatCurrency(w.balance, 'EGP')})
+                      {w.phoneNumber} ({formatCurrency(w.balance, 'USDT')})
                     </option>
                   ))}
                 </select>
@@ -1713,14 +1896,14 @@ export const AgentPortalView: React.FC = () => {
                     .filter((w) => w.id !== fromWalletId)
                     .map((w) => (
                       <option key={w.id} value={w.id}>
-                        {w.phoneNumber} ({formatCurrency(w.balance, 'EGP')})
+                        {w.phoneNumber} ({formatCurrency(w.balance, 'USDT')})
                       </option>
                     ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-600 font-semibold mb-1">Transfer Amount (EGP)</label>
+                <label className="block text-slate-600 font-semibold mb-1">Transfer Amount (USDT)</label>
                 <input
                   type="number"
                   required

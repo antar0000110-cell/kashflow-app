@@ -33,6 +33,7 @@ import {
   UserCheck,
   FileSpreadsheet,
   Globe,
+  SlidersHorizontal,
   X,
   Shield
 } from 'lucide-react';
@@ -68,6 +69,7 @@ export const AdminSidebar: React.FC = () => {
     pendingDeposits,
     pendingWithdrawals,
     agentDepositRequests,
+    agentPayouts,
     agents,
     selectedAgentId,
     wallets,
@@ -116,6 +118,7 @@ export const AdminSidebar: React.FC = () => {
   };
 
   const pendingAgentDepCount = agentDepositRequests.filter((r) => r.status === 'Pending').length;
+  const pendingPayoutCount = agentPayouts.filter((p) => p.status === 'Pending').length;
 
   // Selected agent for agent portal
   const currentAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
@@ -135,42 +138,37 @@ export const AdminSidebar: React.FC = () => {
       items: [
         {
           id: 'dashboard',
-          label: 'Operations Overview',
+          label: 'لوحة التحكم الرئيسية',
           icon: <LayoutDashboard className="w-3.5 h-3.5 text-rose-400" />,
         },
         {
-          id: 'banks',
-          label: 'Master Bank Accounts',
-          icon: <Building2 className="w-3.5 h-3.5" />,
-        },
-        {
           id: 'pending-deposits',
-          label: 'Pending Deposits Queue',
+          label: 'طلبات الإيداع المعلقة',
           icon: <Clock className="w-3.5 h-3.5 text-emerald-400" />,
           badge: pendingDeposits.length,
           badgeColor: 'bg-[#8B1E2D]',
         },
         {
-          id: 'deposit-requests',
-          label: 'Deposit Requests History',
+          id: 'deposit-history',
+          label: 'سجل عمليات الإيداع',
           icon: <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />,
         },
         {
           id: 'pending-withdrawals',
-          label: 'Pending Payouts Queue',
+          label: 'طلبات السحب المعلقة',
           icon: <Clock className="w-3.5 h-3.5 text-amber-400" />,
           badge: pendingWithdrawals.length,
           badgeColor: 'bg-amber-600',
         },
         {
-          id: 'withdrawal-requests',
-          label: 'Withdrawal Requests History',
+          id: 'withdrawal-history',
+          label: 'سجل عمليات السحب',
           icon: <ArrowUpFromLine className="w-3.5 h-3.5 text-amber-400" />,
         },
         {
-          id: 'payment-queries',
-          label: 'Payment Queries & Claims',
-          icon: <FileQuestion className="w-3.5 h-3.5 text-sky-400" />,
+          id: 'disputes',
+          label: 'الشكاوى والإيداع الخاطئ',
+          icon: <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />,
         },
       ],
     },
@@ -181,127 +179,94 @@ export const AdminSidebar: React.FC = () => {
       items: [
         {
           id: 'agent-management',
-          label: 'Subagent Accounts & Quotas',
+          label: 'إدارة حسابات الوكلاء',
           icon: <Users className="w-3.5 h-3.5" />,
           badge: pendingAgentDepCount > 0 ? `${pendingAgentDepCount} New` : undefined,
           badgeColor: 'bg-[#8B1E2D]',
         },
         {
-          id: 'wallet-pool',
-          label: '6,000 Wallets & OTP Pool',
-          icon: <Key className="w-3.5 h-3.5 text-purple-400" />,
+          id: 'deposit-requests-to-admin',
+          label: 'طلبات شحن تأمين الوكلاء',
+          icon: <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-400" />,
+          badge: pendingAgentDepCount > 0 ? pendingAgentDepCount : undefined,
+          badgeColor: 'bg-emerald-600',
+        },
+        {
+          id: 'agent-payouts',
+          label: 'صرف أرباح وعمولات الوكلاء',
+          icon: <DollarSign className="w-3.5 h-3.5 text-amber-400" />,
+          badge: pendingPayoutCount > 0 ? pendingPayoutCount : undefined,
+          badgeColor: 'bg-amber-600',
+        },
+        {
+          id: 'agent-mobile-app',
+          label: 'تطبيق الوكيل (Management OS)',
+          icon: <Smartphone className="w-3.5 h-3.5 text-emerald-400" />,
         },
         {
           id: 'agent-portal',
-          label: 'Agent Operational Terminal',
+          label: 'محاكاة واجهة الوكيل',
           icon: <Briefcase className="w-3.5 h-3.5 text-amber-400" />,
-        },
-        {
-          id: 'mobile-wallet-apk',
-          label: 'Agent Wallet APK & Share Link',
-          icon: <Smartphone className="w-3.5 h-3.5 text-rose-300" />,
         },
       ],
     },
     {
-      title: 'USER DIRECTORY',
-      icon: <Users className="w-3.5 h-3.5 text-slate-400" />,
+      title: 'WALLET POOL & UZX WALLET',
+      icon: <Key className="w-3.5 h-3.5 text-purple-400" />,
       defaultOpen: true,
       items: [
         {
-          id: 'users',
-          label: 'Users List',
-          icon: <Users className="w-3.5 h-3.5" />,
+          id: 'wallet-pool',
+          label: 'مجمع المحافظ (6,000 Wallets)',
+          icon: <Key className="w-3.5 h-3.5 text-purple-400" />,
         },
         {
-          id: 'user-wallets',
-          label: 'User Wallets Directory',
-          icon: <WalletIcon className="w-3.5 h-3.5" />,
+          id: 'mobile-apk-wallet',
+          label: 'تطبيق المحفظة (UZX Wallet)',
+          icon: <Smartphone className="w-3.5 h-3.5 text-rose-400" />,
+        },
+        {
+          id: 'wallet-template',
+          label: 'محرر وقوالب المحفظة',
+          icon: <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />,
+        },
+      ],
+    },
+    {
+      title: 'FINANCIAL & LEDGER',
+      icon: <FileSpreadsheet className="w-3.5 h-3.5 text-rose-400" />,
+      defaultOpen: false,
+      items: [
+        {
+          id: 'financial-reports',
+          label: 'التقارير المالية والأرباح',
+          icon: <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />,
         },
         {
           id: 'transactions',
-          label: 'Universal Transaction Ledger',
+          label: 'سجل الحركات العام (Ledger)',
           icon: <Receipt className="w-3.5 h-3.5" />,
         },
       ],
     },
     {
-      title: 'PAYMENTS & GATEWAYS',
-      icon: <CreditCard className="w-3.5 h-3.5 text-slate-400" />,
-      defaultOpen: false,
-      items: [
-        {
-          id: 'payment-providers',
-          label: 'Payment Providers',
-          icon: <Layers className="w-3.5 h-3.5" />,
-        },
-        {
-          id: 'currencies',
-          label: 'Currencies & Rates',
-          icon: <Coins className="w-3.5 h-3.5" />,
-        },
-        {
-          id: 'bank-accounts',
-          label: 'Partner Banking Accounts',
-          icon: <Building2 className="w-3.5 h-3.5" />,
-        },
-      ],
-    },
-    {
-      title: 'FINANCIAL REPORTS',
-      icon: <FileSpreadsheet className="w-3.5 h-3.5 text-rose-400" />,
-      defaultOpen: true,
-      items: [
-        {
-          id: 'financial-reports',
-          label: 'Agent Profit Excel Reports',
-          icon: <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />,
-        },
-        {
-          id: 'agent-audit',
-          label: 'Real-Time Commission Audit',
-          icon: <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />,
-        },
-        {
-          id: 'agent-payouts',
-          label: 'Agent Payouts & Balance Top-up',
-          icon: <DollarSign className="w-3.5 h-3.5 text-amber-400" />,
-        },
-        {
-          id: 'deposit-reports',
-          label: 'Deposit Analytics',
-          icon: <TrendingUp className="w-3.5 h-3.5" />,
-        },
-        {
-          id: 'referrals',
-          label: 'Referral Commissions',
-          icon: <Share2 className="w-3.5 h-3.5" />,
-        },
-      ],
-    },
-    {
-      title: 'SYSTEM ENGINE',
+      title: 'SYSTEM & SIMULATION',
       icon: <Bot className="w-3.5 h-3.5 text-rose-400" />,
       defaultOpen: false,
       items: [
         {
           id: 'bot-engine',
-          label: '6k Traffic Engine & Dynamic Ratios',
+          label: 'محرك محاكاة وتوليد الطلبات',
           icon: <Bot className="w-3.5 h-3.5" />,
         },
         {
           id: 'domain-settings',
-          label: 'Domains & Server Deployment',
+          label: 'النطاقات والـ SSL',
           icon: <Globe className="w-3.5 h-3.5 text-blue-400" />,
         },
         {
-          id: 'admin-users',
-          label: 'System Administrators',
-          icon: <ShieldCheck className="w-3.5 h-3.5" />,
-        },
-        {
           id: 'settings',
-          label: 'Platform Settings',
+          label: 'إعدادات النظام',
           icon: <Settings className="w-3.5 h-3.5" />,
         },
       ],
@@ -335,7 +300,7 @@ export const AdminSidebar: React.FC = () => {
                 {currentAgent?.name || 'Agent Workspace'}
               </div>
               <div className="text-[11px] text-slate-400 font-mono">
-                Balance: <strong className="text-emerald-400">{formatCurrency(currentAgent?.currentBalance || 0, 'EGP')}</strong>
+                Balance: <strong className="text-emerald-400">{formatCurrency(currentAgent?.currentBalance || 0, currentAgent?.currency || 'USDT')}</strong>
               </div>
               <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                 ID: {currentAgent?.id} • @{currentAgent?.username}

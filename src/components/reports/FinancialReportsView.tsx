@@ -35,6 +35,8 @@ export const FinancialReportsView: React.FC = () => {
     agentPayouts,
     commissionRates,
     payoutAgentCommission,
+    approveAgentPayout,
+    rejectAgentPayout,
     adjustAgentAccountBalance,
     selectedAgentId,
     setSelectedAgentId,
@@ -44,11 +46,16 @@ export const FinancialReportsView: React.FC = () => {
   const [filterAgent, setFilterAgent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Approve Payout State
+  const [selectedPendingPayout, setSelectedPendingPayout] = useState<any>(null);
+  const [approvalTxHash, setApprovalTxHash] = useState<string>('');
+  const [rejectReason, setRejectReason] = useState<string>('');
+
   // Payout Modal State
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [targetAgentId, setTargetAgentId] = useState<string>('');
   const [payoutAmount, setPayoutAmount] = useState<number>(0);
-  const [payoutMethod, setPayoutMethod] = useState<string>('Vodafone Cash');
+  const [payoutMethod, setPayoutMethod] = useState<string>('TRC20 Network');
   const [referenceNumber, setReferenceNumber] = useState<string>('');
   const [payoutNotes, setPayoutNotes] = useState<string>('');
 
@@ -101,8 +108,8 @@ export const FinancialReportsView: React.FC = () => {
       return {
         agentId: agent.id,
         agentName: agent.name,
-        currency: agent.currency || 'EGP',
-        phone: agent.phone || '010XXXXXXXX',
+        currency: agent.currency || 'USDT',
+        phone: agent.phone || 'TRC20-NODE-XXXX',
         currentBalance: agent.currentBalance,
         insuranceDeposit: agent.insuranceDeposit,
         depositCount: agentDeposits.length * periodMultiplier || (agent.todayProcessedCount || 8) * periodMultiplier,
@@ -123,7 +130,7 @@ export const FinancialReportsView: React.FC = () => {
     });
   }, [agents, depositHistory, withdrawalHistory, agentPayouts, commissionRates, reportPeriod]);
 
-  // Aggregated volume by currency (EGP vs USD) utility breakdown
+  // Aggregated volume by currency (USDT vs USD) utility breakdown
   const currencySummary = useMemo(() => {
     return aggregateVolumeByCurrency(depositHistory, withdrawalHistory, agents);
   }, [depositHistory, withdrawalHistory, agents]);
@@ -173,19 +180,19 @@ export const FinancialReportsView: React.FC = () => {
       'Report Period': periodLabel,
       'Date (Cairo Time)': cairoDateStr,
       'Deposit Count': row.depositCount,
-      'Total Deposit Volume (EGP)': row.depositVolume,
+      'Total Deposit Volume (USDT)': row.depositVolume,
       'Deposit Commission Rate (%)': `${row.depositCommissionRate}%`,
-      'Deposit Commission (EGP)': Math.round(row.depositCommission),
+      'Deposit Commission (USDT)': Math.round(row.depositCommission),
       'Withdrawal Count': row.withdrawalCount,
-      'Total Withdrawal Volume (EGP)': row.withdrawalVolume,
+      'Total Withdrawal Volume (USDT)': row.withdrawalVolume,
       'Withdrawal Commission Rate (%)': `${row.withdrawalCommissionRate}%`,
-      'Withdrawal Commission (EGP)': Math.round(row.withdrawalCommission),
-      'Total Volume (EGP)': row.totalVolume,
+      'Withdrawal Commission (USDT)': Math.round(row.withdrawalCommission),
+      'Total Volume (USDT)': row.totalVolume,
       'Total Transactions': row.totalOrders,
-      'Total Commission Earned (EGP)': Math.round(row.totalCommission),
-      'Settled Payouts (EGP)': Math.round(row.settledPayouts),
-      'Net Due Commission (EGP)': Math.round(row.netDueCommission),
-      'Current Wallet Balance (EGP)': row.currentBalance,
+      'Total Commission Earned (USDT)': Math.round(row.totalCommission),
+      'Settled Payouts (USDT)': Math.round(row.settledPayouts),
+      'Net Due Commission (USDT)': Math.round(row.netDueCommission),
+      'Current Wallet Balance (USDT)': row.currentBalance,
       'Agent Status': row.status === 'active' ? 'Active' : 'Suspended',
     }));
 
@@ -197,19 +204,19 @@ export const FinancialReportsView: React.FC = () => {
       'Report Period': periodLabel,
       'Date (Cairo Time)': cairoDateStr,
       'Deposit Count': '-',
-      'Total Deposit Volume (EGP)': '-',
+      'Total Deposit Volume (USDT)': '-',
       'Deposit Commission Rate (%)': '-',
-      'Deposit Commission (EGP)': '-',
+      'Deposit Commission (USDT)': '-',
       'Withdrawal Count': '-',
-      'Total Withdrawal Volume (EGP)': '-',
+      'Total Withdrawal Volume (USDT)': '-',
       'Withdrawal Commission Rate (%)': '-',
-      'Withdrawal Commission (EGP)': '-',
-      'Total Volume (EGP)': totals.volume,
+      'Withdrawal Commission (USDT)': '-',
+      'Total Volume (USDT)': totals.volume,
       'Total Transactions': totals.orders,
-      'Total Commission Earned (EGP)': Math.round(totals.commission),
-      'Settled Payouts (EGP)': Math.round(totals.settled),
-      'Net Due Commission (EGP)': Math.round(totals.due),
-      'Current Wallet Balance (EGP)': '-',
+      'Total Commission Earned (USDT)': Math.round(totals.commission),
+      'Settled Payouts (USDT)': Math.round(totals.settled),
+      'Net Due Commission (USDT)': Math.round(totals.due),
+      'Current Wallet Balance (USDT)': '-',
       'Agent Status': '-',
     });
 
@@ -361,7 +368,7 @@ export const FinancialReportsView: React.FC = () => {
             <TrendingUp className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-lg font-bold font-mono text-slate-900">
-            {formatCurrency(totals.volume, 'EGP')}
+            {formatCurrency(totals.volume, 'USDT')}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             {totals.orders} completed transactions
@@ -374,7 +381,7 @@ export const FinancialReportsView: React.FC = () => {
             <DollarSign className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-lg font-bold font-mono text-emerald-700">
-            {formatCurrency(totals.commission, 'EGP')}
+            {formatCurrency(totals.commission, 'USDT')}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             Deposit & cashout commissions
@@ -387,7 +394,7 @@ export const FinancialReportsView: React.FC = () => {
             <CheckCircle2 className="w-4 h-4 text-purple-600" />
           </div>
           <div className="text-lg font-bold font-mono text-purple-700">
-            {formatCurrency(totals.settled, 'EGP')}
+            {formatCurrency(totals.settled, 'USDT')}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             Transferred to agent accounts
@@ -400,7 +407,7 @@ export const FinancialReportsView: React.FC = () => {
             <Clock className="w-4 h-4 text-amber-600" />
           </div>
           <div className="text-lg font-bold font-mono text-amber-700">
-            {formatCurrency(totals.due, 'EGP')}
+            {formatCurrency(totals.due, 'USDT')}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
             Pending settlement & payout
@@ -421,13 +428,13 @@ export const FinancialReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Currency Liquidity Breakdown (EGP vs USD) */}
+      {/* Currency Liquidity Breakdown (USDT Global) */}
       <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
           <div>
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
               <Building className="w-4 h-4 text-emerald-700" />
-              <span>Liquidity Breakdown by Currency (EGP vs USD / USDT)</span>
+              <span>Liquidity Breakdown by Currency (USDT &amp; USD Liquidity)</span>
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
               Real-time aggregated trading volume split across base settlement currencies per subagent account.
@@ -435,7 +442,7 @@ export const FinancialReportsView: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-              EGP Total: {formatCurrency(currencySummary.egp.totalVolume, 'EGP')}
+              USDT Total: {formatCurrency(currencySummary.egp.totalVolume, 'USDT')}
             </span>
             <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 font-bold">
               USD Total: ${currencySummary.usd.totalVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -458,8 +465,8 @@ export const FinancialReportsView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
                 <div className="p-1.5 bg-emerald-50/60 rounded border border-emerald-200/60">
-                  <div className="text-[10px] font-sans text-emerald-800 font-semibold">EGP Volume</div>
-                  <div className="font-bold text-emerald-900 mt-0.5">{formatCurrency(agentCur.egpTotalVolume, 'EGP')}</div>
+                  <div className="text-[10px] font-sans text-emerald-800 font-semibold">USDT Volume</div>
+                  <div className="font-bold text-emerald-900 mt-0.5">{formatCurrency(agentCur.egpTotalVolume, 'USDT')}</div>
                 </div>
 
                 <div className="p-1.5 bg-blue-50/60 rounded border border-blue-200/60">
@@ -552,46 +559,46 @@ export const FinancialReportsView: React.FC = () => {
 
                   <td className="py-3 px-3">
                     <div className="font-mono text-slate-900 font-medium">
-                      {formatCurrency(row.depositVolume, 'EGP')}
+                      {formatCurrency(row.depositVolume, 'USDT')}
                     </div>
                     <div className="text-[10px] text-emerald-700 font-mono flex items-center gap-1">
                       <ArrowUpRight className="w-3 h-3" />
-                      <span>Profit ({row.depositCommissionRate}%): {formatCurrency(row.depositCommission, 'EGP')}</span>
+                      <span>Profit ({row.depositCommissionRate}%): {formatCurrency(row.depositCommission, 'USDT')}</span>
                     </div>
                   </td>
 
                   <td className="py-3 px-3">
                     <div className="font-mono text-slate-900 font-medium">
-                      {formatCurrency(row.withdrawalVolume, 'EGP')}
+                      {formatCurrency(row.withdrawalVolume, 'USDT')}
                     </div>
                     <div className="text-[10px] text-purple-700 font-mono flex items-center gap-1">
                       <ArrowDownRight className="w-3 h-3" />
-                      <span>Profit ({row.withdrawalCommissionRate}%): {formatCurrency(row.withdrawalCommission, 'EGP')}</span>
+                      <span>Profit ({row.withdrawalCommissionRate}%): {formatCurrency(row.withdrawalCommission, 'USDT')}</span>
                     </div>
                   </td>
 
                   <td className="py-3 px-3">
                     <div className="text-sm font-bold font-mono text-emerald-700">
-                      {formatCurrency(row.totalCommission, 'EGP')}
+                      {formatCurrency(row.totalCommission, 'USDT')}
                     </div>
                     <div className="text-[10px] text-slate-500 font-mono">
-                      Net Due: {formatCurrency(row.netDueCommission, 'EGP')}
+                      Net Due: {formatCurrency(row.netDueCommission, 'USDT')}
                     </div>
                   </td>
 
                   <td className="py-3 px-3 font-mono text-slate-700">
                     <div className="font-semibold text-purple-700">
-                      {formatCurrency(row.settledPayouts, 'EGP')}
+                      {formatCurrency(row.settledPayouts, 'USDT')}
                     </div>
                     <div className="text-[10px] text-slate-400">Fully Settled</div>
                   </td>
 
                   <td className="py-3 px-3 font-mono">
                     <div className="font-bold text-[#8B1E2D]">
-                      {formatCurrency(row.currentBalance, 'EGP')}
+                      {formatCurrency(row.currentBalance, 'USDT')}
                     </div>
                     <div className="text-[10px] text-slate-500">
-                      Collateral: {formatCurrency(row.insuranceDeposit, 'EGP')}
+                      Collateral: {formatCurrency(row.insuranceDeposit, 'USDT')}
                     </div>
                   </td>
 
@@ -622,6 +629,139 @@ export const FinancialReportsView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Pending Agent Payout Requests (TRC20 Fast Approval) */}
+      <div className="bg-white rounded border border-amber-300 shadow-2xs overflow-hidden">
+        <div className="p-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-amber-700" />
+            <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+              طلبات سحب عمولات الوكلاء المعلقة (Pending Commission Payout Requests)
+            </h3>
+          </div>
+          <span className="text-[11px] font-bold text-amber-800 font-mono">
+            {agentPayouts.filter((p) => p.status === 'Pending').length} طلب معلق
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-right border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-100 text-slate-700 border-b border-slate-200 select-none">
+                <th className="py-2.5 px-3 font-semibold text-[11px] text-right">رقم الطلب</th>
+                <th className="py-2.5 px-3 font-semibold text-[11px] text-right">اسم الوكيل</th>
+                <th className="py-2.5 px-3 font-semibold text-[11px] text-right">المبلغ المطلوب</th>
+                <th className="py-2.5 px-3 font-semibold text-[11px] text-right">عنوان المحفظة (USDT TRC20)</th>
+                <th className="py-2.5 px-3 font-semibold text-[11px] text-right">ملاحظات الوكيل</th>
+                <th className="py-2.5 px-3 font-semibold text-[11px] text-right">التاريخ والوقت</th>
+                <th className="py-2.5 px-3 font-semibold text-[11px] text-center">إجراءات الأدمن</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {agentPayouts.filter((p) => p.status === 'Pending').length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-6 text-center text-slate-400">
+                    لا توجد طلبات سحب أرباح معلقة حالياً من الوكلاء.
+                  </td>
+                </tr>
+              ) : (
+                agentPayouts
+                  .filter((p) => p.status === 'Pending')
+                  .map((p) => (
+                    <tr key={p.id} className="hover:bg-amber-50/50">
+                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{p.id}</td>
+                      <td className="py-2.5 px-3 font-bold text-slate-800">{p.agentName}</td>
+                      <td className="py-2.5 px-3 font-mono font-black text-emerald-700 text-sm">
+                        {p.amount.toLocaleString()} USDT
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-700 text-[11px]">
+                        <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 block truncate max-w-[200px]">
+                          {p.payoutAddress || 'TRC20 Wallet'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-500">{p.notes || 'طلب سحب أرباح'}</td>
+                      <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">{p.createdAt}</td>
+                      <td className="py-2.5 px-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setSelectedPendingPayout(p)}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-[11px] shadow-2xs"
+                          >
+                            تأكيد التحويل (TxID)
+                          </button>
+                          <button
+                            onClick={() => {
+                              const reason = prompt('سبب رفض طلب السحب:') || 'بيانات غير مطابقة';
+                              rejectAgentPayout(p.id, reason);
+                            }}
+                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded font-semibold text-[11px] border border-rose-200"
+                          >
+                            رفض
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Approve Payout TxHash Modal */}
+      {selectedPendingPayout && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-5 space-y-4 border border-slate-200 shadow-xl text-right">
+            <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
+              تأكيد تحويل وصرف الأرباح للوكيل
+            </h3>
+            <div className="text-xs space-y-2 bg-slate-50 p-3 rounded border border-slate-200">
+              <div className="flex justify-between">
+                <span className="text-slate-500">الوكيل:</span>
+                <span className="font-bold text-slate-900">{selectedPendingPayout.agentName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">المبلغ المطلوب:</span>
+                <span className="font-mono font-bold text-emerald-700">{selectedPendingPayout.amount} USDT</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">عنوان TRC20:</span>
+                <span className="font-mono text-slate-800 text-[10px]">{selectedPendingPayout.payoutAddress}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">رقم المعاملة على البلوكشين (TxHash / TxID):</label>
+              <input
+                type="text"
+                value={approvalTxHash}
+                onChange={(e) => setApprovalTxHash(e.target.value)}
+                placeholder="0x... أو TX-..."
+                className="w-full text-xs font-mono p-2 border border-slate-300 rounded text-left"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setSelectedPendingPayout(null)}
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={() => {
+                  approveAgentPayout(selectedPendingPayout.id, approvalTxHash || `TX-${Date.now().toString().slice(-8)}`);
+                  setSelectedPendingPayout(null);
+                  setApprovalTxHash('');
+                }}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow"
+              >
+                تأكيد الإرسال والخصم من أرباح الوكيل
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Historical Payout Log */}
       <div className="bg-white rounded border border-slate-200 shadow-2xs overflow-hidden">
@@ -654,7 +794,7 @@ export const FinancialReportsView: React.FC = () => {
                   <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{p.referenceNumber}</td>
                   <td className="py-2.5 px-3 font-medium text-slate-800">{p.agentName}</td>
                   <td className="py-2.5 px-3 font-mono font-bold text-emerald-700">
-                    {formatCurrency(p.amount, p.currency || 'EGP')}
+                    {formatCurrency(p.amount, p.currency || 'USDT')}
                   </td>
                   <td className="py-2.5 px-3 text-slate-600">{p.paymentMethod}</td>
                   <td className="py-2.5 px-3 text-slate-500">{p.notes || 'Routine commission settlement'}</td>
@@ -711,8 +851,8 @@ export const FinancialReportsView: React.FC = () => {
 
                 <div className="bg-slate-50 p-3 rounded border border-slate-200">
                   <div className="text-[10px] text-slate-500 font-bold uppercase">Collateral Balance</div>
-                  <div className="text-sm font-bold font-mono text-[#8B1E2D]">{formatCurrency(selectedAg.insuranceDeposit, 'EGP')}</div>
-                  <div className="text-[10px] text-emerald-600 font-semibold">Wallet: {formatCurrency(selectedAg.currentBalance, 'EGP')}</div>
+                  <div className="text-sm font-bold font-mono text-[#8B1E2D]">{formatCurrency(selectedAg.insuranceDeposit, 'USDT')}</div>
+                  <div className="text-[10px] text-emerald-600 font-semibold">Wallet: {formatCurrency(selectedAg.currentBalance, 'USDT')}</div>
                 </div>
 
                 <div className="bg-slate-50 p-3 rounded border border-slate-200">
@@ -768,7 +908,7 @@ export const FinancialReportsView: React.FC = () => {
                                 {t.type.toUpperCase()}
                               </span>
                             </td>
-                            <td className="py-2 px-3 font-bold text-slate-900">{formatCurrency(t.amount, 'EGP')}</td>
+                            <td className="py-2 px-3 font-bold text-slate-900">{formatCurrency(t.amount, t.currency || 'USDT')}</td>
                             <td className="py-2 px-3 text-slate-600 font-sans">{t.provider}</td>
                             <td className="py-2 px-3">
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -817,7 +957,7 @@ export const FinancialReportsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">Disbursed Commission Amount (EGP)</label>
+                <label className="block text-slate-700 font-semibold mb-1">Disbursed Commission Amount (USDT)</label>
                 <input
                   type="number"
                   required
@@ -835,11 +975,10 @@ export const FinancialReportsView: React.FC = () => {
                   onChange={(e) => setPayoutMethod(e.target.value)}
                   className="w-full h-8 px-2 border border-slate-300 rounded bg-white"
                 >
-                  <option value="Vodafone Cash">Vodafone Cash</option>
-                  <option value="InstaPay Direct">InstaPay Direct</option>
-                  <option value="Orange Cash">Orange Cash</option>
-                  <option value="Etisalat Cash">Etisalat Cash</option>
-                  <option value="Bank Wire Transfer">Bank Wire Transfer</option>
+                  <option value="TRC20 Network">TRC20 Network</option>
+                  <option value="TRON Direct">TRON Direct</option>
+                  <option value="USDT Hot Wallet">USDT Hot Wallet</option>
+                  <option value="Central Liquidity Node">Central Liquidity Node</option>
                   <option value="Direct Balance Credit">Direct Balance Credit</option>
                 </select>
               </div>
@@ -852,7 +991,7 @@ export const FinancialReportsView: React.FC = () => {
                   value={referenceNumber}
                   onChange={(e) => setReferenceNumber(e.target.value)}
                   className="w-full h-8 px-2.5 border border-slate-300 rounded font-mono text-slate-900"
-                  placeholder="e.g. VF-PAY-98124"
+                  placeholder="e.g. TRC-PAY-98124"
                 />
               </div>
 
@@ -918,7 +1057,7 @@ export const FinancialReportsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">New Account Balance (EGP)</label>
+                <label className="block text-slate-700 font-semibold mb-1">New Account Balance (USDT)</label>
                 <input
                   type="number"
                   required

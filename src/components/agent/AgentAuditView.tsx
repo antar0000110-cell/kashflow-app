@@ -144,7 +144,7 @@ export const AgentAuditView: React.FC = () => {
     const exportData = filteredRecords.map((r) => ({
       'Order ID': r.id,
       'Type': r.type,
-      'Currency': r.currency || 'EGP',
+      'Currency': r.currency || 'USDT',
       'Amount': r.amount,
       'Assigned Agent': r.agentNameDisplay,
       'Configured Commission %': `${r.appliedRatePercent}%`,
@@ -161,7 +161,7 @@ export const AgentAuditView: React.FC = () => {
     const exportData = filteredRecords.map((r) => ({
       'Order ID': r.id,
       'Type': r.type,
-      'Currency': r.currency || 'EGP',
+      'Currency': r.currency || 'USDT',
       'Amount': r.amount,
       'Assigned Agent': r.agentNameDisplay,
       'Configured Commission %': `${r.appliedRatePercent}%`,
@@ -234,7 +234,7 @@ export const AgentAuditView: React.FC = () => {
             <Layers className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-xl font-black text-slate-900 mt-1 font-mono">
-            {formatCurrency(summaryMetrics.totalVolumeEgp, 'EGP')}
+            {formatCurrency(summaryMetrics.totalVolumeEgp, 'USDT')}
           </div>
           <div className="text-[10px] text-slate-500 mt-0.5">
             USD Volume: ${summaryMetrics.totalVolumeUsd.toLocaleString()}
@@ -247,7 +247,7 @@ export const AgentAuditView: React.FC = () => {
             <Calculator className="w-4 h-4 text-purple-600" />
           </div>
           <div className="text-xl font-black text-purple-800 mt-1 font-mono">
-            {formatCurrency(summaryMetrics.totalCalculatedCommissionEgp, 'EGP')}
+            {formatCurrency(summaryMetrics.totalCalculatedCommissionEgp, 'USDT')}
           </div>
           <div className="text-[10px] text-slate-500 mt-0.5">
             Based on active agent rates
@@ -260,7 +260,7 @@ export const AgentAuditView: React.FC = () => {
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-xl font-black text-emerald-800 mt-1 font-mono">
-            {formatCurrency(summaryMetrics.totalRecordedCommissionEgp, 'EGP')}
+            {formatCurrency(summaryMetrics.totalRecordedCommissionEgp, 'USDT')}
           </div>
           <div className="text-[10px] text-emerald-600 font-semibold mt-0.5">
             100% Synced with Ledger
@@ -355,7 +355,7 @@ export const AgentAuditView: React.FC = () => {
               className="w-full h-8 px-2 border border-slate-300 rounded bg-white text-slate-800 text-xs focus:ring-1 focus:ring-blue-600"
             >
               <option value="all">All Currencies</option>
-              <option value="EGP">EGP</option>
+              <option value="USDT">USDT</option>
               <option value="USD">USD</option>
             </select>
           </div>
@@ -421,16 +421,16 @@ export const AgentAuditView: React.FC = () => {
                       <div className="text-[10px] text-slate-500">{r.subagentId || 'Standard'}</div>
                     </td>
                     <td className="p-3 font-mono font-bold text-slate-900">
-                      {formatCurrency(r.amount, r.currency || 'EGP')}
+                      {formatCurrency(r.amount, r.currency || 'USDT')}
                     </td>
                     <td className="p-3 font-mono text-purple-900 font-bold">
                       {r.appliedRatePercent}%
                     </td>
                     <td className="p-3 font-mono text-emerald-700 font-bold">
-                      {formatCurrency(r.calculatedCommission, r.currency || 'EGP')}
+                      {formatCurrency(r.calculatedCommission, r.currency || 'USDT')}
                     </td>
                     <td className="p-3 font-mono text-slate-900 font-bold">
-                      {formatCurrency(r.recordedCommission, r.currency || 'EGP')}
+                      {formatCurrency(r.recordedCommission, r.currency || 'USDT')}
                     </td>
                     <td className="p-3">
                       {r.isVerifiedMatch ? (
@@ -504,7 +504,7 @@ export const AgentAuditView: React.FC = () => {
                 </div>
                 <div className="flex justify-between font-mono text-slate-600">
                   <span>Transaction Amount:</span>
-                  <span className="font-bold text-slate-900">{formatCurrency(selectedAuditRecord.amount, selectedAuditRecord.currency || 'EGP')}</span>
+                  <span className="font-bold text-slate-900">{formatCurrency(selectedAuditRecord.amount, selectedAuditRecord.currency || 'USDT')}</span>
                 </div>
                 <div className="flex justify-between font-mono text-slate-600">
                   <span>Assigned Subagent:</span>
@@ -518,7 +518,7 @@ export const AgentAuditView: React.FC = () => {
                   <span>Exact Mathematical Formula</span>
                 </div>
                 <div className="p-3 bg-white rounded border border-purple-100 font-mono text-center text-slate-800 text-sm">
-                  {selectedAuditRecord.amount.toLocaleString()} {selectedAuditRecord.currency || 'EGP'} × {selectedAuditRecord.appliedRatePercent}% = <span className="text-purple-700 font-bold">{selectedAuditRecord.calculatedCommission.toFixed(2)}</span>
+                  {selectedAuditRecord.amount.toLocaleString()} {selectedAuditRecord.currency || 'USDT'} × {selectedAuditRecord.appliedRatePercent}% = <span className="text-purple-700 font-bold">{selectedAuditRecord.calculatedCommission.toFixed(2)}</span>
                 </div>
                 <p className="text-[11px] text-purple-800 leading-relaxed">
                   Formula breakdown: Transaction Volume multiplied by active agent commission percentage divided by 100.
@@ -529,13 +529,13 @@ export const AgentAuditView: React.FC = () => {
                 <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                   <div className="text-[10px] uppercase font-bold text-slate-500">Calculated DB Commission</div>
                   <div className="text-base font-black font-mono text-purple-800 mt-1">
-                    {formatCurrency(selectedAuditRecord.calculatedCommission, selectedAuditRecord.currency || 'EGP')}
+                    {formatCurrency(selectedAuditRecord.calculatedCommission, selectedAuditRecord.currency || 'USDT')}
                   </div>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                   <div className="text-[10px] uppercase font-bold text-slate-500">Recorded Ledger Earnings</div>
                   <div className="text-base font-black font-mono text-emerald-800 mt-1">
-                    {formatCurrency(selectedAuditRecord.recordedCommission, selectedAuditRecord.currency || 'EGP')}
+                    {formatCurrency(selectedAuditRecord.recordedCommission, selectedAuditRecord.currency || 'USDT')}
                   </div>
                 </div>
               </div>

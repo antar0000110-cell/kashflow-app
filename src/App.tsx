@@ -11,9 +11,16 @@ import { ListOfBanksView } from './components/operations/ListOfBanksView';
 import { PaymentQueriesView } from './components/operations/PaymentQueriesView';
 import { AgentManagementView } from './components/agent/AgentManagementView';
 import { AgentPortalView } from './components/agent/AgentPortalView';
+import { ManagementOSAgentAppView } from './components/agent/ManagementOSAgentAppView';
 import { AgentAuditView } from './components/agent/AgentAuditView';
 import { WalletPoolView } from './components/wallet/WalletPoolView';
 import { MobileApkWalletView } from './components/wallet/MobileApkWalletView';
+import { WalletTemplateEditorView } from './components/admin/WalletTemplateEditorView';
+import { DisputeManagementView } from './components/disputes/DisputeManagementView';
+import { DepositHistoryView } from './components/operations/DepositHistoryView';
+import { WithdrawalHistoryView } from './components/operations/WithdrawalHistoryView';
+import { AgentDetailView } from './components/agent/AgentDetailView';
+import { AgentPayoutsView } from './components/agent/AgentPayoutsView';
 import { BotEngineView } from './components/bot/BotEngineView';
 import { FinancialReportsView } from './components/reports/FinancialReportsView';
 import { DomainSettingsView } from './components/settings/DomainSettingsView';
@@ -142,6 +149,13 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
     return () => clearInterval(botTimer);
   }, [isSessionActive, authRole, botConfig.isEnabled, globalTrafficActive, botConfig.intervalSeconds, triggerBotOrder]);
 
+  // Native Capacitor Wrapper APK Detection:
+  // If running inside Capacitor (compiled APK), strictly and exclusively show the MobileApkWalletView!
+  const isNativeCapacitor = typeof window !== 'undefined' && (window as any).Capacitor !== undefined;
+  if (isNativeCapacitor) {
+    return <MobileApkWalletView />;
+  }
+
   // Unauthenticated Gateway
   if (authRole === 'guest') {
     return <LoginView />;
@@ -168,10 +182,15 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
       case 'pending-deposits':
         return <PendingDepositsView />;
       case 'deposit-requests':
-        return <DepositRequestsView />;
+      case 'deposit-history':
+        return <DepositHistoryView />;
       case 'pending-withdrawals':
-      case 'withdrawal-requests':
         return <PendingWithdrawalsView />;
+      case 'withdrawal-requests':
+      case 'withdrawal-history':
+        return <WithdrawalHistoryView />;
+      case 'disputes':
+        return <DisputeManagementView />;
       case 'banks':
       case 'bank-accounts':
         return <ListOfBanksView />;
@@ -183,20 +202,28 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
       case 'subagents':
       case 'deposit-requests-to-admin':
         return <AgentManagementView />;
+      case 'agent-detail':
+        return <AgentDetailView />;
       case 'agent-portal':
         return <AgentPortalView />;
+      case 'agent-mobile-app':
+      case 'management-os':
+        return <ManagementOSAgentAppView />;
       case 'agent-audit':
         return <AgentAuditView />;
       case 'wallet-pool':
       case 'user-wallets':
         return <WalletPoolView />;
+      case 'wallet-template':
+        return <WalletTemplateEditorView />;
       case 'mobile-wallet-apk':
       case 'mobile-apk-wallet':
         return <MobileApkWalletView />;
       case 'bot-engine':
         return <BotEngineView />;
-      case 'financial-reports':
       case 'agent-payouts':
+        return <AgentPayoutsView />;
+      case 'financial-reports':
       case 'deposit-reports':
       case 'withdrawal-reports':
         return <FinancialReportsView />;
@@ -204,7 +231,7 @@ export function App({ hasValidSession = false }: { hasValidSession?: boolean }) 
         return <DomainSettingsView />;
       case 'transactions':
       case 'transaction-reports':
-        return <DepositRequestsView />;
+        return <DepositHistoryView />;
       default:
         return <Dashboard />;
     }

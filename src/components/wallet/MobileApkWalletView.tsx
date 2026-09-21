@@ -39,6 +39,7 @@ const SAVED_WALLETS_KEY = STORAGE_KEYS.KASHFLOW_SAVED_WALLETS;
 export const MobileApkWalletView: React.FC = () => {
   const {
     wallets,
+    walletTemplate,
     transferBetweenWallets,
     depositHistory,
     withdrawalHistory,
@@ -63,32 +64,47 @@ export const MobileApkWalletView: React.FC = () => {
   const [loginError, setLoginError] = useState('');
   const [activeWalletNumber, setActiveWalletNumber] = useState(() => {
     try {
-      return StorageUtil.get(STORAGE_KEYS.KASHFLOW_ACTIVE_NUMBER) || '01031860138';
+      const storedNum = StorageUtil.get(STORAGE_KEYS.KASHFLOW_ACTIVE_NUMBER);
+      if (storedNum && (storedNum.startsWith('0') || /^\d{10,12}$/.test(storedNum))) {
+        return 'TSa9281hG82ks901847192';
+      }
+      return storedNum || 'TSa9281hG82ks901847192';
     } catch {
-      return '01031860138';
+      return 'TSa9281hG82ks901847192';
     }
   });
 
   useEffect(() => {
     try {
+      // If the logged in user is associated with an old phone format, log them out.
+      const storedActive = StorageUtil.get(STORAGE_KEYS.KASHFLOW_ACTIVE_NUMBER);
+      if (storedActive && (storedActive.startsWith('0') || /^\d{10,12}$/.test(storedActive))) {
+        StorageUtil.set(STORAGE_KEYS.KASHFLOW_LOGGED_IN, 'false');
+        StorageUtil.remove(STORAGE_KEYS.KASHFLOW_ACTIVE_NUMBER);
+        setIsLoggedIn(false);
+      }
+
       const stored = StorageUtil.get(SAVED_WALLETS_KEY);
-      if (stored) {
-        const list = JSON.parse(stored);
-        if (Array.isArray(list)) {
-          setSavedWallets(list);
-          if (list.length > 0 && !walletNumberInput) {
-            setWalletNumberInput(list[0]);
-          }
-        }
+      let list = stored ? JSON.parse(stored) : null;
+      
+      const isStale = Array.isArray(list) && list.some(item => typeof item === 'string' && (item.startsWith('0') || /^\d{10,12}$/.test(item)));
+      if (isStale) {
+        list = null;
+      }
+
+      if (list && Array.isArray(list)) {
+        setSavedWallets(list);
       } else {
-        // Default list of initial wallets
-        const initial = ['01031860138', '01018073883', '01092530012', '01055419082'];
+        // Default list of initial TRC20 wallets
+        const initial = ['TSa9281hG82ks901847192', 'TX5z81pA92ks891047192', 'TY7x902rT91ks892019482', 'TD4s201vD82ks029381029'];
         setSavedWallets(initial);
         StorageUtil.set(SAVED_WALLETS_KEY, JSON.stringify(initial));
       }
     } catch {
-      setSavedWallets(['01031860138', '01018073883']);
+      setSavedWallets(['TSa9281hG82ks901847192', 'TX5z81pA92ks891047192']);
     }
+    // Explicitly make sure the input starts completely empty to show the "wallet id" placeholder
+    setWalletNumberInput('');
   }, []);
 
   // Inside Wallet Navigation & Tab State
@@ -172,15 +188,15 @@ export const MobileApkWalletView: React.FC = () => {
 
   // Forms State
   const [depositAmount, setDepositAmount] = useState<number>(500);
-  const [depositMethod, setDepositMethod] = useState('Vodafone Cash');
+  const [depositMethod, setDepositMethod] = useState('TRC20 Network');
   const [depositSuccess, setDepositSuccess] = useState(false);
 
   const [withdrawAmount, setWithdrawAmount] = useState<number>(300);
-  const [withdrawRecipient, setWithdrawRecipient] = useState('01018073883');
-  const [withdrawMethod, setWithdrawMethod] = useState('Vodafone Cash');
+  const [withdrawRecipient, setWithdrawRecipient] = useState('TX5z81pA92ks891047192');
+  const [withdrawMethod, setWithdrawMethod] = useState('TRC20 Network');
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
 
-  const [transferTarget, setTransferTarget] = useState('01092530012');
+  const [transferTarget, setTransferTarget] = useState('TY7x902rT91ks892019482');
   const [transferAmount, setTransferAmount] = useState<number>(200);
   const [transferSuccess, setTransferSuccess] = useState(false);
   const [transferError, setTransferError] = useState('');
@@ -190,8 +206,8 @@ export const MobileApkWalletView: React.FC = () => {
     e.preventDefault();
     setLoginError('');
     const cleanNumber = walletNumberInput.trim();
-    if (!cleanNumber || cleanNumber.length < 9) {
-      setLoginError('Please enter a valid 11-digit mobile wallet number');
+    if (!cleanNumber || cleanNumber.length < 3) {
+      setLoginError('Please enter a valid Wallet ID');
       triggerHaptic("light");
       return;
     }
@@ -265,7 +281,7 @@ export const MobileApkWalletView: React.FC = () => {
     SecureLogout.forceLogout();
   };
 
-  const handleCopyPhone = () => {
+  const handleCopyWalletId = () => {
     navigator.clipboard.writeText(activeWalletNumber);
     triggerHaptic("light");
     setCopied(true);
@@ -280,7 +296,7 @@ export const MobileApkWalletView: React.FC = () => {
     setDepositSuccess(true);
     sendNativePushNotification(
       'Deposit Successful',
-      `Credited ${formatCurrency(depositAmount, 'EGP')} to wallet ${activeWalletNumber} via ${depositMethod}.`,
+      `Credited ${formatCurrency(depositAmount, 'USDT')} to wallet ${activeWalletNumber} via ${depositMethod}.`,
       'success'
     );
     setTimeout(() => {
@@ -298,7 +314,7 @@ export const MobileApkWalletView: React.FC = () => {
     setWithdrawSuccess(true);
     sendNativePushNotification(
       'Cash-Out Completed',
-      `Processed payout of ${formatCurrency(withdrawAmount, 'EGP')} to ${withdrawRecipient}.`,
+      `Processed payout of ${formatCurrency(withdrawAmount, 'USDT')} to ${withdrawRecipient}.`,
       'info'
     );
     setTimeout(() => {
@@ -328,7 +344,7 @@ export const MobileApkWalletView: React.FC = () => {
     setTransferSuccess(true);
     sendNativePushNotification(
       'تم إرسال التحويل',
-      `تم تحويل ${formatCurrency(transferAmount, 'EGP')} بنجاح إلى ${transferTarget}.`,
+      `تم تحويل ${formatCurrency(transferAmount, 'USDT')} بنجاح إلى ${transferTarget}.`,
       'success'
     );
     setTimeout(() => {
@@ -382,7 +398,7 @@ export const MobileApkWalletView: React.FC = () => {
             >
               <BellRing className={`w-3 h-3 ${getNativePermission() === 'granted' ? 'text-emerald-600' : 'text-amber-500 animate-pulse'}`} />
             </button>
-            <span className="text-[10px] font-bold text-emerald-600">Vodafone 4G+</span>
+            <span className="text-[10px] font-bold text-emerald-600">TRON Network 4G+</span>
             <div className="w-5 h-2.5 border border-slate-400 rounded-2xs flex items-center p-0.5">
               <div className="w-full h-full bg-emerald-500 rounded-3xs" />
             </div>
@@ -394,19 +410,21 @@ export const MobileApkWalletView: React.FC = () => {
           <div className="flex-1 p-6 flex flex-col justify-between bg-slate-50 overflow-y-auto">
             <div className="space-y-6 pt-4 text-center">
               {/* Brand Logo */}
-              <div className="w-20 h-20 rounded-2xl bg-[#0F172A] p-1.5 flex items-center justify-center mx-auto shadow-xl border border-slate-700/60">
-                <img
-                  src="/uzx-logo.png"
-                  alt="UZX Wallet Logo"
-                  className="w-full h-full rounded-xl object-contain"
-                  referrerPolicy="no-referrer"
-                />
+              <div
+                className="w-20 h-20 rounded-2xl p-1.5 flex items-center justify-center mx-auto shadow-xl border border-slate-700/60"
+                style={{ backgroundColor: walletTemplate?.primaryColor || '#0F172A' }}
+              >
+                <div className="w-full h-full rounded-xl flex items-center justify-center font-black text-2xl text-white tracking-wider">
+                  {walletTemplate?.logoText || 'UZX'}
+                </div>
               </div>
 
               <div>
-                <h2 className="text-xl font-black tracking-wide text-slate-900">UZX WALLET</h2>
+                <h2 className="text-xl font-black tracking-wide text-slate-900 uppercase">
+                  {walletTemplate?.appName || 'UZX WALLET'}
+                </h2>
                 <p className="text-xs text-slate-500 mt-1 font-medium">
-                  Official Egyptian Fast Electronic Wallet Gateway
+                  {walletTemplate?.brandTagline || 'Official TRC20 Fast Electronic Wallet Gateway'}
                 </p>
               </div>
 
@@ -421,25 +439,22 @@ export const MobileApkWalletView: React.FC = () => {
               {loginStep === 'enter_number' && (
                 <form onSubmit={handleProceedToOtp} className="space-y-4 text-left">
                   <div className="relative">
-                    <label className="block text-slate-700 text-xs font-semibold mb-1.5">
-                      Wallet Number (Vodafone Cash / InstaPay)
-                    </label>
                     <input
-                      type="tel"
+                      type="text"
                       value={walletNumberInput}
                       onChange={(e) => {
                         setWalletNumberInput(e.target.value);
                         setShowSavedDropdown(true);
                       }}
                       onFocus={() => setShowSavedDropdown(true)}
-                      placeholder="010XXXXXXXX"
+                      placeholder="Wallet ID"
                       required
                       className="w-full h-11 px-3 border border-slate-300 rounded-xl font-mono text-sm bg-white text-slate-900 focus:ring-2 focus:ring-[#8B1E2D] focus:border-transparent outline-none transition-all text-left"
                     />
 
                     {/* Saved Wallets History Cache Dropdown */}
                     {showSavedDropdown && filteredSuggestions.length > 0 && (
-                      <div className="absolute left-0 right-0 top-[68px] bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-44 overflow-y-auto divide-y divide-slate-100 text-left">
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-20 max-h-44 overflow-y-auto divide-y divide-slate-100 text-left">
                         <div className="p-2 bg-slate-50 text-[10px] text-slate-500 font-semibold text-left">
                           Previously Saved Wallets
                         </div>
@@ -475,7 +490,7 @@ export const MobileApkWalletView: React.FC = () => {
               {loginStep === 'enter_otp' && (
                 <form onSubmit={handleVerifyOtp} className="space-y-4 text-left">
                   <div className="p-3 bg-rose-50/70 rounded-xl border border-rose-100 text-left">
-                    <div className="text-[11px] text-slate-500">Wallet Number:</div>
+                    <div className="text-[11px] text-slate-500">Wallet ID:</div>
                     <div className="font-mono font-bold text-sm text-[#8B1E2D]">{walletNumberInput}</div>
                     <p className="text-[10px] text-slate-500 mt-1">
                       Verification code is provided by your assigned operator/agent to authorize session access.
@@ -508,7 +523,7 @@ export const MobileApkWalletView: React.FC = () => {
                       }}
                       className="w-1/3 h-11 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
                     >
-                      Change Number
+                      Change Wallet ID
                     </button>
                     <button
                       type="submit"
@@ -523,32 +538,32 @@ export const MobileApkWalletView: React.FC = () => {
             </div>
 
             <div className="text-center text-[10px] text-slate-400 font-mono py-2">
-              KashFlow Secure Mobile Banking Engine v4.2
+              UZX Secure Mobile Wallet Engine v4.2
             </div>
           </div>
         ) : (
           /* LOGGED IN: REALISTIC WALLET INTERFACE (NO OTP FIELD INSIDE) */
           <>
             {/* Mobile Header Bar */}
-            <div className="px-4 py-3 bg-[#8B1E2D] text-white flex items-center justify-between shrink-0 shadow-xs select-none">
+            <div
+              className="px-4 py-3 text-white flex items-center justify-between shrink-0 shadow-xs select-none"
+              style={{ backgroundColor: walletTemplate?.primaryColor || '#8B1E2D' }}
+            >
               <div className="flex items-center gap-2">
-                <img
-                  src="/uzx-logo.png"
-                  alt="UZX Logo"
-                  className="w-8 h-8 rounded-lg object-contain shadow-xs border border-white/20 bg-black/20 p-0.5"
-                  referrerPolicy="no-referrer"
-                />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs bg-white/20 border border-white/30 text-white">
+                  {walletTemplate?.logoText || 'UZX'}
+                </div>
                 <div>
                   <div className="text-xs font-bold tracking-wide flex items-center gap-1">
-                    <span>UZX Wallet</span>
-                    <span className="text-[9px] bg-rose-950/80 text-rose-200 px-1 py-0.2 rounded border border-rose-800/80 font-mono">LIVE</span>
+                    <span>{walletTemplate?.appName || 'UZX Wallet'}</span>
+                    <span className="text-[9px] bg-black/40 text-emerald-300 px-1 py-0.2 rounded border border-white/20 font-mono">LIVE</span>
                   </div>
-                  <div className="text-[10px] text-rose-200 font-mono flex items-center gap-1">
+                  <div className="text-[10px] text-white/80 font-mono flex items-center gap-1">
                     <span>{activeWalletNumber}</span>
                     <button
-                      onClick={handleCopyPhone}
-                      className="p-0.5 text-rose-200 hover:text-white cursor-pointer"
-                      title="Copy wallet number"
+                      onClick={handleCopyWalletId}
+                      className="p-0.5 text-white/80 hover:text-white cursor-pointer"
+                      title="Copy Wallet ID"
                     >
                       {copied ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
                     </button>
@@ -562,15 +577,15 @@ export const MobileApkWalletView: React.FC = () => {
                     triggerHaptic("light");
                     setIsNotificationModalOpen(true);
                   }}
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-rose-100 flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer"
-                  title="Push Notifications &amp; Permissions"
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer"
+                  title="Push Notifications & Permissions"
                 >
                   <BellRing className="w-3.5 h-3.5" />
                 </button>
 
                 <button
                   onClick={handleLogout}
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-rose-100 flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer"
                   title="Sign Out"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -579,31 +594,42 @@ export const MobileApkWalletView: React.FC = () => {
               </div>
             </div>
 
+            {/* Announcement Banner if configured in template */}
+            {walletTemplate?.announcementText && (
+              <div className="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[11px] text-amber-900 font-medium text-center flex items-center justify-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span>{walletTemplate.announcementText}</span>
+              </div>
+            )}
+
             {/* Mobile Screen Body - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {/* 1. HOME VIEW */}
               {activeTab === 'home' && (
                 <div className="space-y-4">
                   {/* Balance Card */}
-                  <div className="p-4 bg-[#8B1E2D] rounded-2xl shadow-sm text-white space-y-3">
-                    <div className="flex items-center justify-between text-xs text-rose-100">
+                  <div
+                    className="p-4 rounded-2xl shadow-sm text-white space-y-3"
+                    style={{ backgroundColor: walletTemplate?.primaryColor || '#8B1E2D' }}
+                  >
+                    <div className="flex items-center justify-between text-xs text-white/90">
                       <span className="font-medium">Available Balance</span>
                       <button
                         onClick={() => {
                           triggerHaptic("light");
                           setShowBalance(!showBalance);
                         }}
-                        className="p-1 text-rose-200 hover:text-white cursor-pointer"
+                        className="p-1 text-white/80 hover:text-white cursor-pointer"
                       >
                         {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                       </button>
                     </div>
 
                     <div className="text-2xl font-bold font-mono tracking-tight text-left">
-                      {showBalance ? formatCurrency(userBalance, 'EGP') : '••••••••'}
+                      {showBalance ? formatCurrency(userBalance, 'USDT') : '••••••••'}
                     </div>
 
-                    <div className="pt-2 border-t border-white/20 flex items-center justify-between text-[11px] text-rose-100 font-mono">
+                    <div className="pt-2 border-t border-white/20 flex items-center justify-between text-[11px] text-white/80 font-mono">
                       <span>Node Status: Active</span>
                       <span className="text-emerald-300 font-semibold flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
@@ -613,7 +639,7 @@ export const MobileApkWalletView: React.FC = () => {
                   </div>
 
                   {/* Dynamic Security Token (OTP) Card with Circular Progress Countdown */}
-                  <WalletSecurityDisplay walletNumber={activeWalletNumber || '01031860138'} />
+                  <WalletSecurityDisplay walletNumber={activeWalletNumber || 'TSa9281hG82ks901847192'} />
 
                   {/* 3 Main Required Buttons: Cash In, Cash Out, Transfer */}
                   <div className="grid grid-cols-3 gap-2.5 text-center select-none">
@@ -667,14 +693,14 @@ export const MobileApkWalletView: React.FC = () => {
                   <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2 text-left">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-800">
                       <span>Daily Transfer Limit</span>
-                      <span className="font-mono text-[#8B1E2D]">1,200 / 30,000 EGP</span>
+                      <span className="font-mono text-[#8B1E2D]">1,200 / 30,000 USDT</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                       <div className="bg-[#8B1E2D] h-full rounded-full" style={{ width: '6%' }} />
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                      <span>Monthly: 100,000 EGP</span>
-                      <span>Single Tx: 5,000 EGP</span>
+                      <span>Monthly: 100,000 USDT</span>
+                      <span>Single Tx: 5,000 USDT</span>
                     </div>
                   </div>
 
@@ -732,7 +758,7 @@ export const MobileApkWalletView: React.FC = () => {
                               }`}
                             >
                               {tx.direction === 'inbound' ? '+' : '-'}
-                              {formatCurrency(tx.amount, 'EGP')}
+                              {formatCurrency(tx.amount, 'USDT')}
                             </div>
                             <div className="text-[10px] text-slate-400">
                               {tx.status}
@@ -772,23 +798,44 @@ export const MobileApkWalletView: React.FC = () => {
                         onChange={(e) => setDepositMethod(e.target.value)}
                         className="w-full h-10 px-3 border border-slate-300 rounded-xl bg-white text-slate-900 text-xs"
                       >
-                        <option value="Vodafone Cash">Vodafone Cash (010)</option>
-                        <option value="InstaPay">InstaPay Direct</option>
-                        <option value="Orange Cash">Orange Cash (012)</option>
-                        <option value="Etisalat Cash">Etisalat Cash (011)</option>
+                        <option value="TRC20 Network">TRC20 Network (USDT)</option>
+                        <option value="TRON Direct">TRON Direct Transfer</option>
+                        <option value="USDT Hot Wallet">USDT Hot Wallet</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-slate-700 font-semibold text-xs mb-1">Deposit Amount (EGP)</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-slate-700 font-semibold text-xs">{walletTemplate?.depositTitle || 'Deposit Amount (USDT)'}</label>
+                        <span className="text-[10px] text-slate-400 font-mono">Min: {walletTemplate?.minDeposit || 10} USDT</span>
+                      </div>
                       <input
                         type="number"
-                        min="10"
+                        min={walletTemplate?.minDeposit || 10}
+                        max={walletTemplate?.maxDeposit || 50000}
                         required
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(Number(e.target.value))}
                         className="w-full h-10 px-3 border border-slate-300 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-[#8B1E2D] bg-white text-slate-900 text-left"
                       />
+
+                      {/* Quick Amount Chips from Dynamic Wallet Template */}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {(walletTemplate?.quickAmounts || [50, 100, 250, 500, 1000, 3000]).map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => setDepositAmount(amt)}
+                            className={`px-2.5 py-1 text-[11px] font-mono font-bold rounded-lg border transition-colors cursor-pointer ${
+                              depositAmount === amt
+                                ? 'bg-[#8B1E2D] text-white border-[#8B1E2D]'
+                                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                            }`}
+                          >
+                            +{amt}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <button
@@ -825,19 +872,19 @@ export const MobileApkWalletView: React.FC = () => {
 
                   <form onSubmit={handleWithdrawSubmit} className="space-y-3.5 text-left">
                     <div>
-                      <label className="block text-slate-700 font-semibold text-xs mb-1">Recipient Wallet Number</label>
+                      <label className="block text-slate-700 font-semibold text-xs mb-1">Recipient Wallet ID</label>
                       <input
                         type="text"
                         required
                         value={withdrawRecipient}
                         onChange={(e) => setWithdrawRecipient(e.target.value)}
-                        placeholder="010XXXXXXXX"
+                        placeholder="Wallet ID"
                         className="w-full h-10 px-3 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-[#8B1E2D] bg-white text-slate-900 text-left"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-700 font-semibold text-xs mb-1">Withdrawal Amount (EGP)</label>
+                      <label className="block text-slate-700 font-semibold text-xs mb-1">Withdrawal Amount (USDT)</label>
                       <input
                         type="number"
                         min="10"
@@ -848,7 +895,7 @@ export const MobileApkWalletView: React.FC = () => {
                         className="w-full h-10 px-3 border border-slate-300 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-[#8B1E2D] bg-white text-slate-900 text-left"
                       />
                       <div className="text-[10px] text-slate-500 mt-1">
-                        Available Balance: {formatCurrency(userBalance, 'EGP')}
+                        Available Balance: {formatCurrency(userBalance, 'USDT')}
                       </div>
                     </div>
 
@@ -892,19 +939,19 @@ export const MobileApkWalletView: React.FC = () => {
 
                   <form onSubmit={handleTransferSubmit} className="space-y-3.5 text-left">
                     <div>
-                      <label className="block text-slate-700 font-semibold text-xs mb-1">Destination Wallet Number</label>
+                      <label className="block text-slate-700 font-semibold text-xs mb-1">Destination Wallet ID</label>
                       <input
                         type="text"
                         required
                         value={transferTarget}
                         onChange={(e) => setTransferTarget(e.target.value)}
-                        placeholder="010XXXXXXXX"
+                        placeholder="Wallet ID"
                         className="w-full h-10 px-3 border border-slate-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-[#8B1E2D] bg-white text-slate-900 text-left"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-700 font-semibold text-xs mb-1">Transfer Amount (EGP)</label>
+                      <label className="block text-slate-700 font-semibold text-xs mb-1">Transfer Amount (USDT)</label>
                       <input
                         type="number"
                         min="10"
@@ -915,7 +962,7 @@ export const MobileApkWalletView: React.FC = () => {
                         className="w-full h-10 px-3 border border-slate-300 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-[#8B1E2D] bg-white text-slate-900 text-left"
                       />
                       <div className="text-[10px] text-slate-500 mt-1">
-                        Available Balance: {formatCurrency(userBalance, 'EGP')}
+                        Available Balance: {formatCurrency(userBalance, 'USDT')}
                       </div>
                     </div>
 
@@ -990,7 +1037,7 @@ export const MobileApkWalletView: React.FC = () => {
                               }`}
                             >
                               {tx.direction === 'inbound' ? '+' : '-'}
-                              {formatCurrency(tx.amount, 'EGP')}
+                              {formatCurrency(tx.amount, 'USDT')}
                             </div>
                             <div className="text-[10px] text-slate-400">{tx.status}</div>
                           </div>
@@ -1070,7 +1117,7 @@ export const MobileApkWalletView: React.FC = () => {
 
             <h3 className="font-bold text-sm text-slate-900">Transfer Receipt</h3>
             <p className="text-2xl font-bold font-mono text-[#8B1E2D]">
-              {formatCurrency(selectedTxDetail.amount, 'EGP')}
+              {formatCurrency(selectedTxDetail.amount, 'USDT')}
             </p>
 
             <div className="p-3 bg-slate-50 rounded-xl text-left text-xs space-y-1.5 font-mono">

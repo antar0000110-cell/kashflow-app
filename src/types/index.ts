@@ -28,6 +28,7 @@ export interface Transaction {
   surname?: string;
   patronymic?: string;
   userFullName: string;
+  userPhone?: string;
   amount: number;
   currency: string;
   status: TransactionStatus;
@@ -57,6 +58,8 @@ export interface Transaction {
   processedBy?: string;
   processedByRole?: 'admin' | 'agent';
   rejectionReason?: string;
+  customerPayoutAddress?: string;
+  customerAddress?: string;
   createdAt: string; // ISO string
   expiresAt: string; // ISO string for auto-cancellation (4 hours)
 }
@@ -67,7 +70,7 @@ export interface Wallet {
   phoneNumber?: string;
   accountNumber?: string;
   accountHolder?: string;
-  provider: string; // e.g. Vodafone Cash, InstaPay, Orange Cash, Etisalat Cash, WE Pay
+  provider: string; // e.g. TRC20 Network, TRON Direct, USDT Hot Wallet, Central Liquidity Node
   agentId: string | null;
   agentName: string | null;
   assignedAgentId?: string | null;
@@ -104,6 +107,7 @@ export interface Agent {
   phone: string;
   status: 'active' | 'suspended';
   insuranceDeposit: number;
+  securityDeposit?: number;
   currentBalance: number;
   trafficThreshold: number;
   trafficActive: boolean;
@@ -124,6 +128,7 @@ export interface Agent {
   depositMethod?: string;
   depositPaymentAddress: string;
   depositAddress?: string;
+  payoutAddress?: string;
   depositCommissionPercent?: number; // e.g. 3% (نسبة أرباح الإيداع)
   withdrawalCommissionPercent?: number; // e.g. 1% (نسبة أرباح السحب)
   useTieredCommission?: boolean; // Enable volume-based tiered rate structure
@@ -131,7 +136,7 @@ export interface Agent {
   withdrawalTiers?: CommissionTier[]; // Tiered rates based on withdrawal volume threshold
   profitBalance?: number; // Current accumulated profit balance from processed deposits and withdrawals (رصيد الأرباح)
   totalEarnedCommission?: number; // Lifetime total profit/commission earned
-  currency?: string; // e.g. EGP, USD, USDT, USDC
+  currency?: string; // e.g. USDT, USD, EUR, USDC
   customCurrencyName?: string;
   password?: string;
   assignedWalletCount: number;
@@ -154,6 +159,7 @@ export interface AgentDepositRequest {
   amountRequested: number;
   requestedAmount?: number;
   amountApproved?: number;
+  currency?: string;
   paymentMethod: string;
   referenceNumber: string;
   txReference?: string;
@@ -171,10 +177,14 @@ export interface AgentPayout {
   currency: string;
   payoutType: 'commission' | 'bonus' | 'account_topup' | 'settlement';
   paymentMethod: string;
+  payoutAddress?: string;
+  status?: 'Pending' | 'Approved' | 'Rejected';
   referenceNumber: string;
+  txHash?: string;
   notes?: string;
-  processedBy: string;
+  processedBy?: string;
   createdAt: string;
+  processedAt?: string;
 }
 
 export interface DomainSettings {
@@ -199,6 +209,7 @@ export interface BotEngineConfig {
   depositRatio: number; // floating ratio e.g. 0.70
   targetDepositPercent: number; // e.g. 70 (70% deposit, 30% withdrawal)
   ratioJitterPercent: number; // e.g. 10 (±10% random jitter)
+  wrongWalletErrorRatePercent?: number; // e.g. 10 (10% wrong wallet simulation rate)
   effectiveTodayDepositRatio?: number;
   todayDepositsGenerated?: number;
   todayWithdrawalsGenerated?: number;
@@ -220,4 +231,57 @@ export interface AppNotification {
   agentId?: string;
   targetAgentId?: string;
   orderId?: string;
+}
+
+export interface WalletTemplateConfig {
+  appName: string;
+  brandTagline: string;
+  primaryColor: string;
+  accentColor: string;
+  depositTitle: string;
+  withdrawTitle: string;
+  depositHeaderTitle?: string;
+  withdrawalHeaderTitle?: string;
+  depositAddress: string;
+  depositNetwork: string;
+  minDeposit: number;
+  maxDeposit: number;
+  quickAmounts: number[];
+  quickDepositAmounts?: number[];
+  supportUrl: string;
+  announcementText: string;
+  showTransactionHistory: boolean;
+  showQrCode: boolean;
+  logoText: string;
+  logoUrl?: string;
+  lastUpdated: string;
+}
+
+export interface DisputeReport {
+  id: string;
+  orderId: string;
+  agentId: string;
+  agentName: string;
+  disputeType?: 'mismatched_amount' | 'wrong_wallet' | 'unconfirmed_deposit' | 'delayed_credit';
+  reason?: string;
+  userFullName?: string;
+  userPhone?: string;
+  expectedAmount?: number;
+  receivedAmount: number;
+  requestedWallet?: string;
+  expectedWallet?: string;
+  actualSenderWallet?: string;
+  actualSentWallet?: string;
+  currency?: string;
+  status: 'Open' | 'UnderReview' | 'Under_Review' | 'Resolved' | 'Rejected';
+  agentComment?: string;
+  notes?: string;
+  proofScreenshotUrl?: string;
+  proofImageUrl?: string;
+  proofVideoUrl?: string;
+  proofFileName?: string;
+  adminResolutionNote?: string;
+  createdAt: string;
+  dueAt: string;
+  resolvedAt?: string;
 }

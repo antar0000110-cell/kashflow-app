@@ -23,6 +23,8 @@ export const STORAGE_KEYS = {
   PERSISTED_WALLETS: 'uzx_persisted_wallets',
   PERSISTED_AGENT_DEPOSIT_REQUESTS: 'uzx_persisted_agentDepositRequests',
   PERSISTED_AGENT_PAYOUTS: 'uzx_persisted_agentPayouts',
+  PERSISTED_WALLET_TEMPLATE: 'uzx_persisted_walletTemplate',
+  PERSISTED_DISPUTES: 'uzx_persisted_disputes',
   PERSISTED_IS_PRODUCTION_MODE: 'uzx_persisted_isProductionMode',
   PERSISTED_COMMISSION_RATES: 'uzx_persisted_commissionRates',
   PERSISTED_DOMAIN_SETTINGS: 'uzx_persisted_domainSettings',

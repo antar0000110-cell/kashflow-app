@@ -160,7 +160,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ transactio
               <div className="text-2xl font-bold font-mono text-[#8B1E2D] tracking-tight mt-0.5">
                 {formatCurrency(transaction.amount, transaction.currency)}
               </div>
-              <span className="text-[10px] text-gray-400">Gateway Fee: 0.00 EGP (Net: {formatCurrency(transaction.amount, transaction.currency)})</span>
+              <span className="text-[10px] text-gray-400">Gateway Fee: 0.00 USDT (Net: {formatCurrency(transaction.amount, transaction.currency || 'USDT')})</span>
             </div>
 
             <div className="text-right">
@@ -297,7 +297,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({ transactio
                 <option value="">-- Choose Target Agent --</option>
                 {agents.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} ({a.id}) - Current Balance: {formatCurrency(a.currentBalance, 'EGP')}
+                    {a.name} ({a.id}) - Current Balance: {formatCurrency(a.currentBalance, a.currency || 'USDT')}
                   </option>
                 ))}
               </select>

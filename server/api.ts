@@ -437,7 +437,180 @@ apiRouter.patch('/wallets/:id', requireAuth, requireAdmin, (req: AuthenticatedRe
 });
 
 // ----------------------------------------------------
-// 5. NOTIFICATIONS
+// 5. WALLET TEMPLATE (Live Dynamic Customizer)
+// ----------------------------------------------------
+
+apiRouter.get('/wallet-template', (req, res: Response) => {
+  res.json({
+    success: true,
+    template: db.getWalletTemplate()
+  });
+});
+
+apiRouter.post('/wallet-template', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  const updated = db.updateWalletTemplate(req.body);
+  realtime.broadcast('wallet-template:updated', updated);
+  res.json({
+    success: true,
+    template: updated
+  });
+});
+
+// ----------------------------------------------------
+// 6. DISPUTES & COMPLAINTS
+// ----------------------------------------------------
+
+apiRouter.get('/disputes', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const filter = user.role === 'agent' ? { agentId: user.agentId } : undefined;
+  res.json({
+    success: true,
+    disputes: db.getDisputes(filter)
+  });
+});
+
+apiRouter.post('/disputes', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const newDispute = db.createDispute({
+    ...req.body,
+    agentId: user.role === 'agent' ? user.agentId! : (req.body.agentId || 'AGT-01'),
+    agentName: user.role === 'agent' ? user.name : (req.body.agentName || 'Agent')
+  });
+
+  realtime.broadcast('dispute:created', newDispute, 'admin');
+  if (newDispute.agentId) {
+    realtime.broadcast('dispute:created', newDispute, `agent:${newDispute.agentId}`);
+  }
+
+  res.json({ success: true, dispute: newDispute });
+});
+
+apiRouter.patch('/disputes/:id', requireAuth, (req: AuthenticatedRequest, res: Response): void => {
+  const { id } = req.params;
+  const updated = db.updateDispute(id, req.body);
+  if (!updated) {
+    res.status(404).json({ success: false, message: 'Dispute not found' });
+    return;
+  }
+
+  realtime.broadcast('dispute:updated', updated, 'admin');
+  if (updated.agentId) {
+    realtime.broadcast('dispute:updated', updated, `agent:${updated.agentId}`);
+  }
+
+  res.json({ success: true, dispute: updated });
+});
+
+// ----------------------------------------------------
+// 7. AGENT DEPOSIT REQUESTS & PAYOUTS
+// ----------------------------------------------------
+
+apiRouter.get('/agent-deposit-requests', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const list = db.getAgentDepositRequests(user.role === 'agent' ? user.agentId : undefined);
+  res.json({ success: true, requests: list });
+});
+
+apiRouter.post('/agent-deposit-requests', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const reqData = req.body;
+  const created = db.createAgentDepositRequest({
+    ...reqData,
+    id: reqData.id || `REQ-${Date.now()}`,
+    agentId: user.role === 'agent' ? user.agentId! : (reqData.agentId || 'AGT-01'),
+    agentName: user.role === 'agent' ? user.name : (reqData.agentName || 'Agent'),
+    createdAt: new Date().toISOString(),
+    status: 'Pending'
+  });
+
+  realtime.broadcast('agent-deposit-request:created', created, 'admin');
+  res.json({ success: true, request: created });
+});
+
+apiRouter.patch('/agent-deposit-requests/:id', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response): void => {
+  const { id } = req.params;
+  const { status, amountApproved } = req.body;
+  const updated = db.updateAgentDepositRequest(id, {
+    status,
+    amountApproved,
+    processedAt: new Date().toISOString()
+  });
+
+  if (!updated) {
+    res.status(404).json({ success: false, message: 'Deposit request not found' });
+    return;
+  }
+
+  if (status === 'Approved' && updated.agentId) {
+    const agent = db.getAgentById(updated.agentId);
+    if (agent) {
+      const addedBal = Number(amountApproved || updated.amountRequested || 0);
+      const newBal = (agent.currentBalance || 0) + addedBal;
+      const newInsurance = Math.max(agent.insuranceDeposit || 0, newBal);
+      db.updateAgent(agent.id, {
+        currentBalance: newBal,
+        insuranceDeposit: newInsurance,
+        trafficActive: true
+      });
+      realtime.broadcast('agent:updated', { id: agent.id, currentBalance: newBal, insuranceDeposit: newInsurance, trafficActive: true });
+    }
+  }
+
+  realtime.broadcast('agent-deposit-request:updated', updated);
+  res.json({ success: true, request: updated });
+});
+
+apiRouter.get('/agent-payouts', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const list = db.getAgentPayouts(user.role === 'agent' ? user.agentId : undefined);
+  res.json({ success: true, payouts: list });
+});
+
+apiRouter.post('/agent-payouts', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user!;
+  const payoutData = req.body;
+  const agentId = user.role === 'agent' ? user.agentId! : (payoutData.agentId || 'AGT-01');
+  const agent = db.getAgentById(agentId);
+
+  const newPayout = db.createAgentPayout({
+    ...payoutData,
+    agentId,
+    agentName: agent?.name || payoutData.agentName || 'Agent',
+    processedBy: user.name || user.username
+  });
+
+  if (agent && payoutData.amount) {
+    const newProfit = Math.max(0, (agent.profitBalance || 0) - Number(payoutData.amount));
+    db.updateAgent(agent.id, {
+      profitBalance: newProfit
+    });
+    realtime.broadcast('agent:updated', { id: agent.id, profitBalance: newProfit });
+  }
+
+  realtime.broadcast('agent-payout:created', newPayout, 'admin');
+  if (agentId) {
+    realtime.broadcast('agent-payout:created', newPayout, `agent:${agentId}`);
+  }
+
+  res.json({ success: true, payout: newPayout });
+});
+
+// ----------------------------------------------------
+// 8. BOT CONFIG
+// ----------------------------------------------------
+
+apiRouter.get('/bot-config', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  res.json({ success: true, config: db.getBotConfig() });
+});
+
+apiRouter.patch('/bot-config', requireAuth, requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+  const updated = db.updateBotConfig(req.body);
+  realtime.broadcast('bot-config:updated', updated);
+  res.json({ success: true, config: updated });
+});
+
+// ----------------------------------------------------
+// 9. NOTIFICATIONS
 // ----------------------------------------------------
 
 apiRouter.get('/notifications', requireAuth, (req: AuthenticatedRequest, res: Response) => {
@@ -463,3 +636,4 @@ apiRouter.post('/admin/reset-system-data', requireAuth, requireAdmin, (req: Auth
     message: 'Reset and database cleanup features are strictly disabled in the production environment for security reasons.'
   });
 });
+

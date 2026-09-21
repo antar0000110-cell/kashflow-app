@@ -1,17 +1,18 @@
 import { BankAccount, Transaction, Wallet, Agent, AgentDepositRequest } from '../types';
-import { generateHash, generateOtpCode, generateWalletNumber } from '../utils/formatters';
+import { generateHash, generateOtpCode } from '../utils/formatters';
+export { generateWalletNumber } from '../utils/formatters';
 import { formatCairoTime } from '../utils/cairoTime';
 
 export const initialBanks: BankAccount[] = [
-  { id: '211753', bankName: 'Vodafone 9253', accountNumber: '01092530012', accountHolder: 'Master Ops 1', createdAt: '2026-07-08 13:21:25', isActive: true, provider: 'Vodafone Cash' },
-  { id: '212879', bankName: 'Vodafone 1684', accountNumber: '01016840045', accountHolder: 'Master Ops 2', createdAt: '2026-07-16 16:49:55', isActive: false, provider: 'Vodafone Cash' },
-  { id: '212881', bankName: 'Vodafone 0216', accountNumber: '01002160098', accountHolder: 'Master Ops 3', createdAt: '2026-07-16 16:49:56', isActive: true, provider: 'Vodafone Cash' },
-  { id: '212883', bankName: 'Vodafone 8214', accountNumber: '01082140033', accountHolder: 'Master Ops 4', createdAt: '2026-07-16 16:49:56', isActive: false, provider: 'Vodafone Cash' },
-  { id: '212885', bankName: 'Vodafone 7655', accountNumber: '01076550077', accountHolder: 'Master Ops 5', createdAt: '2026-07-16 16:49:58', isActive: true, provider: 'Vodafone Cash' },
-  { id: '217623', bankName: 'Vodafone 2055', accountNumber: '01020550019', accountHolder: 'Master Ops 6', createdAt: '2026-08-24 10:46:31', isActive: true, provider: 'Vodafone Cash' },
-  { id: '218940', bankName: 'InstaPay 9021', accountNumber: 'ops.master@instapay', accountHolder: 'Fast Pay Ops', createdAt: '2026-08-29 09:12:04', isActive: true, provider: 'InstaPay' },
-  { id: '219402', bankName: 'Etisalat Cash 401', accountNumber: '01140188231', accountHolder: 'Etisalat Pool 1', createdAt: '2026-09-02 11:30:15', isActive: true, provider: 'Etisalat Cash' },
-  { id: '220114', bankName: 'Orange Cash 772', accountNumber: '01277209112', accountHolder: 'Orange Pool 1', createdAt: '2026-09-10 14:05:40', isActive: true, provider: 'Orange Cash' }
+  { id: '211753', bankName: 'TRC20 Pool A', accountNumber: 'TY7x902rT91ks892019482', accountHolder: 'Master Ops 1', createdAt: '2026-07-08 13:21:25', isActive: true, provider: 'TRC20 Network' },
+  { id: '212879', bankName: 'TRC20 Pool B', accountNumber: 'TX5z81pA92ks891047192', accountHolder: 'Master Ops 2', createdAt: '2026-07-16 16:49:55', isActive: false, provider: 'TRC20 Network' },
+  { id: '212881', bankName: 'TRC20 Pool C', accountNumber: 'TD4s201vD82ks029381029', accountHolder: 'Master Ops 3', createdAt: '2026-07-16 16:49:56', isActive: true, provider: 'TRC20 Network' },
+  { id: '212883', bankName: 'TRC20 Pool D', accountNumber: 'TLk9281hG82ks901847192', accountHolder: 'Master Ops 4', createdAt: '2026-07-16 16:49:56', isActive: false, provider: 'TRC20 Network' },
+  { id: '212885', bankName: 'TRC20 Pool E', accountNumber: 'TSa9281hG82ks901847192', accountHolder: 'Master Ops 5', createdAt: '2026-07-16 16:49:58', isActive: true, provider: 'TRC20 Network' },
+  { id: '217623', bankName: 'TRC20 Pool F', accountNumber: 'TMo9281hG82ks901847192', accountHolder: 'Master Ops 6', createdAt: '2026-08-24 10:46:31', isActive: true, provider: 'TRC20 Network' },
+  { id: '218940', bankName: 'TRC20 Pool G', accountNumber: 'TSb8321vA29ks8201948123', accountHolder: 'Fast Pay Ops', createdAt: '2026-08-29 09:12:04', isActive: true, provider: 'TRC20 Network' },
+  { id: '219402', bankName: 'TRC20 Pool H', accountNumber: 'TYx0283sB29ks0293810294', accountHolder: 'Liquidity Pool 1', createdAt: '2026-09-02 11:30:15', isActive: true, provider: 'TRC20 Network' },
+  { id: '220114', bankName: 'TRC20 Pool I', accountNumber: 'TDo1948sT29ks0193820193', accountHolder: 'Liquidity Pool 2', createdAt: '2026-09-10 14:05:40', isActive: true, provider: 'TRC20 Network' }
 ];
 
 const now = new Date();
@@ -28,7 +29,7 @@ export const initialAgents: Agent[] = [
     name: 'Agent Ahmed (Operations)',
     username: 'ahmed_ops',
     email: 'ahmed.ops@webmanagement.io',
-    phone: '01031860138',
+    phone: 'TSa9281hG82ks901847192',
     status: 'active',
     insuranceDeposit: 25000,
     currentBalance: 25000,
@@ -50,7 +51,7 @@ export const initialAgents: Agent[] = [
     todayAssignedOrders: 0,
     todayAssignedVolumeUSDT: 0,
     processedVolume: 0,
-    depositPaymentMethod: 'USDT TRC20 / Bank Wire',
+    depositPaymentMethod: 'USDT TRC20 Network',
     depositPaymentAddress: 'TRC20: TLk9281hG82ks901847192',
     assignedWalletCount: 5,
     assignedWalletIds: ['WLT-1001', 'WLT-1002', 'WLT-1003', 'WLT-1004', 'WLT-1005'],
@@ -60,7 +61,7 @@ export const initialAgents: Agent[] = [
     name: 'Agent Mohamed (Delta Hub)',
     username: 'mohamed_ops',
     email: 'mohamed.ops@webmanagement.io',
-    phone: '01018073883',
+    phone: 'TX5z81pA92ks891047192',
     status: 'active',
     insuranceDeposit: 15000,
     currentBalance: 15000,
@@ -82,7 +83,7 @@ export const initialAgents: Agent[] = [
     todayAssignedOrders: 0,
     todayAssignedVolumeUSDT: 0,
     processedVolume: 0,
-    depositPaymentMethod: 'USDT TRC20 / InstaPay',
+    depositPaymentMethod: 'USDT TRC20 Network',
     depositPaymentAddress: 'TRC20: TMo9281hG82ks901847192',
     assignedWalletCount: 3,
     assignedWalletIds: ['WLT-2001', 'WLT-2002', 'WLT-2003'],
@@ -92,7 +93,7 @@ export const initialAgents: Agent[] = [
     name: 'Agent Sarah (Cairo Express)',
     username: 'sarah_ops',
     email: 'sarah.ops@webmanagement.io',
-    phone: '01007878721',
+    phone: 'TY7x902rT91ks892019482',
     status: 'active',
     insuranceDeposit: 40000,
     currentBalance: 40000,
@@ -114,7 +115,7 @@ export const initialAgents: Agent[] = [
     todayAssignedOrders: 0,
     todayAssignedVolumeUSDT: 0,
     processedVolume: 0,
-    depositPaymentMethod: 'USDT TRC20 / Bank Wire',
+    depositPaymentMethod: 'USDT TRC20 Network',
     depositPaymentAddress: 'TRC20: TSa9281hG82ks901847192',
     assignedWalletCount: 6,
     assignedWalletIds: ['WLT-3001', 'WLT-3002', 'WLT-3003', 'WLT-3004', 'WLT-3005', 'WLT-3006'],
@@ -125,7 +126,7 @@ export const initialWallets: Wallet[] = [
   // Assigned to Agent Ahmed
   {
     id: 'WLT-1001',
-    walletNumber: '01031860138',
+    walletNumber: 'TSa9281hG82ks901847192',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-01',
     agentName: 'Agent Ahmed (Operations)',
@@ -147,7 +148,7 @@ export const initialWallets: Wallet[] = [
   },
   {
     id: 'WLT-1002',
-    walletNumber: '01092530012',
+    walletNumber: 'TY7x902rT91ks892019482',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-01',
     agentName: 'Agent Ahmed (Operations)',
@@ -169,7 +170,7 @@ export const initialWallets: Wallet[] = [
   },
   {
     id: 'WLT-1003',
-    walletNumber: '01016840045',
+    walletNumber: 'TXa9321jH29sk201938102',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-01',
     agentName: 'Agent Ahmed (Operations)',
@@ -191,7 +192,7 @@ export const initialWallets: Wallet[] = [
   },
   {
     id: 'WLT-1004',
-    walletNumber: '01082140033',
+    walletNumber: 'TDb0183vA29sl029381029',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-01',
     agentName: 'Agent Ahmed (Operations)',
@@ -213,7 +214,7 @@ export const initialWallets: Wallet[] = [
   },
   {
     id: 'WLT-1005',
-    walletNumber: '01076550077',
+    walletNumber: 'TCc0293hS29dk029381029',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-01',
     agentName: 'Agent Ahmed (Operations)',
@@ -237,7 +238,7 @@ export const initialWallets: Wallet[] = [
   // Assigned to Agent Mohamed
   {
     id: 'WLT-2001',
-    walletNumber: '01018073883',
+    walletNumber: 'TX5z81pA92ks891047192',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-02',
     agentName: 'Agent Mohamed (Delta Hub)',
@@ -259,7 +260,7 @@ export const initialWallets: Wallet[] = [
   },
   {
     id: 'WLT-2002',
-    walletNumber: '01002160098',
+    walletNumber: 'TD4s201vD82ks029381029',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-02',
     agentName: 'Agent Mohamed (Delta Hub)',
@@ -281,7 +282,7 @@ export const initialWallets: Wallet[] = [
   },
   {
     id: 'WLT-2003',
-    walletNumber: '01020550019',
+    walletNumber: 'TEe0193bH28dk102938102',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-02',
     agentName: 'Agent Mohamed (Delta Hub)',
@@ -305,7 +306,7 @@ export const initialWallets: Wallet[] = [
   // Assigned to Agent Sarah
   {
     id: 'WLT-3001',
-    walletNumber: '01007878721',
+    walletNumber: 'TYx07878721ks892019482',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-03',
     agentName: 'Agent Sarah (Cairo Express)',
@@ -327,7 +328,7 @@ export const initialWallets: Wallet[] = [
   },
   {
     id: 'WLT-3002',
-    walletNumber: '01033423575',
+    walletNumber: 'TZz033423575ks892019482',
     provider: 'USDT TRC20 Gateway',
     agentId: 'AGT-03',
     agentName: 'Agent Sarah (Cairo Express)',
@@ -349,78 +350,88 @@ export const initialWallets: Wallet[] = [
   },
 
   // Unassigned Pool (Free Wallets ready for assignment)
-  ...Array.from({ length: 30 }).map((_, i) => ({
-    id: `WLT-FREE-${4000 + i}`,
-    walletNumber: `010${Math.floor(10000000 + Math.random() * 90000000)}`,
-    provider: 'USDT TRC20 Gateway',
-    agentId: null,
-    agentName: null,
-    accountHolder: 'Central Wallet Pool',
-    balance: 0,
-    currency: 'USDT',
-    status: 'unassigned' as const,
-    createdAt: '2026-09-01 00:00:00',
-    currentOtp: generateOtpCode(),
-    otpRequestedAt: undefined,
-    minSingleLimit: 10,
-    maxSingleLimit: 5000,
-    dailySendLimit: 20000,
-    dailyReceiveLimit: 30000,
-    monthlyLimit: 100000,
-    todaySent: 0,
-    todayReceived: 0,
-    monthTotal: 0,
-  }))
+  ...Array.from({ length: 30 }).map((_, i) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let randAddress = 'T';
+    for (let j = 0; j < 33; j++) {
+      randAddress += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return {
+      id: `WLT-FREE-${4000 + i}`,
+      walletNumber: randAddress,
+      provider: 'USDT TRC20 Gateway',
+      agentId: null,
+      agentName: null,
+      accountHolder: 'Central Wallet Pool',
+      balance: 0,
+      currency: 'USDT',
+      status: 'unassigned' as const,
+      createdAt: '2026-09-01 00:00:00',
+      currentOtp: generateOtpCode(),
+      otpRequestedAt: undefined,
+      minSingleLimit: 10,
+      maxSingleLimit: 5000,
+      dailySendLimit: 20000,
+      dailyReceiveLimit: 30000,
+      monthlyLimit: 100000,
+      todaySent: 0,
+      todayReceived: 0,
+      monthTotal: 0,
+    };
+  })
 ];
 
 export const initialAgentDepositRequests: AgentDepositRequest[] = [];
 
-// Egyptian Names Pool for realistic customer order generation
+// International Names Pool for realistic customer order generation (aliased under original export names for compatibility)
 export const EGYPTIAN_CUSTOMER_NAMES: string[] = [
-  'Mohamed Ahmed El-Sayed',
-  'Tarek Mahmoud Hassan',
-  'Khaled Ibrahim Mostafa',
-  'Omar Abdelrahman Ali',
-  'Youssef Hossam Farag',
-  'Hassan Mostafa Gad',
-  'Amr Hesham Mansour',
-  'Mostafa Adel Nour',
-  'Nourhan Mohamed Rady',
-  'Salma Sherif Zaki',
-  'Karim Walid Fawzy',
-  'Mona Magdy Helmy',
-  'Bassem Rafik Nabil',
-  'Sherif Ezzat Kamel',
-  'Ehab Essam Tantawy',
-  'Hazem Essam Lotfy',
-  'Ziad Sameh Fouad',
-  'Ayman Shawky Badawi',
-  'Mahmoud Fikry Salem',
-  'Ramy Sobhy Khalil',
-  'Ahmed Gamal Eldin',
-  'Samir Talaat Othman',
-  'Hatem Essam El-Gohary',
-  'Dina Medhat Shokry',
-  'Reem Ashraf Abdelaziz'
+  'Alex Smith',
+  'John Doe',
+  'Jane Miller',
+  'Michael Johnson',
+  'David Williams',
+  'Sarah Connor',
+  'Emily Davis',
+  'Liam Wilson',
+  'Noah Martinez',
+  'James Taylor',
+  'Sophia Anderson',
+  'Oliver Thomas',
+  'Lucas Jackson',
+  'Mason White',
+  'Ethan Harris',
+  'Logan Martin',
+  'Mia Thompson',
+  'Isabella Clark',
+  'Charlotte Lewis',
+  'Amara Kante',
+  'Jin-Woo Park',
+  'Yuki Tanaka',
+  'Carlos Santana',
+  'Fatima Al-Farsi',
+  'Robert Kovac'
 ];
 
 export const getRandomEgyptianName = (): string => {
   return EGYPTIAN_CUSTOMER_NAMES[Math.floor(Math.random() * EGYPTIAN_CUSTOMER_NAMES.length)];
 };
 
-// Persistent 6,000 Client Wallets Pool with Egyptian Carriers & Instant Pay
+// Persistent 6,000 Client Wallets Pool with TRC20 Addresses
 export const SIMULATION_WALLET_POOL: { number: string; provider: string; name: string }[] = Array.from({ length: 6000 }).map((_, idx) => {
-  const providerIndex = idx % 4;
-  const providers = ['Vodafone Cash', 'Orange Cash', 'Etisalat Cash', 'InstaPay'];
-  const prefixes = ['010', '012', '011', '015'];
-
-  const provider = providers[providerIndex];
-  const prefix = prefixes[providerIndex];
-  const num = (10000000 + ((idx * 7919 + 1337) % 89999999)).toString().padStart(8, '0');
+  const provider = 'TRC20 Network';
+  
+  // Deterministic TRC20 address generation starting with T
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let address = 'T';
+  let seed = idx * 7919 + 1337;
+  for (let i = 0; i < 33; i++) {
+    seed = (seed * 9301 + 49297) % 233280;
+    address += chars.charAt(Math.floor((seed / 233280) * chars.length));
+  }
   const name = EGYPTIAN_CUSTOMER_NAMES[idx % EGYPTIAN_CUSTOMER_NAMES.length];
   
   return {
-    number: `${prefix}${num}`,
+    number: address,
     provider,
     name,
   };

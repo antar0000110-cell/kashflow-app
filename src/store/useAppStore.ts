@@ -10,7 +10,9 @@ import {
   DomainSettings,
   BotEngineConfig,
   AppNotification,
-  TransactionStatus
+  TransactionStatus,
+  WalletTemplateConfig,
+  DisputeReport
 } from '../types';
 import {
   initialBanks,
@@ -67,6 +69,13 @@ export type AppSection =
   | 'bot-engine'
   | 'agent-payouts'
   | 'agent-audit'
+  | 'agent-detail'
+  | 'wallet-template'
+  | 'agent-mobile-app'
+  | 'management-os'
+  | 'disputes'
+  | 'deposit-history'
+  | 'withdrawal-history'
   | 'domain-settings';
 
 export interface AppStoreState {
@@ -172,6 +181,10 @@ export interface AppStoreState {
   submitAgentDepositRequest: (agentId: string, amount: number, method: string, ref: string, note: string) => void;
   requestAgentDeposit?: (agentId: string, amount: number, method: string, ref: string, note: string) => void;
   processAgentDepositRequest: (requestId: string, status: 'Approved' | 'Rejected', customApprovedAmount?: number) => void;
+  requestAgentCommissionPayout: (agentId: string, amount: number, payoutAddress: string, notes?: string) => { success: boolean; message: string };
+  requestAgentPayout: (agentId: string, amount: number, payoutAddress: string, notes?: string) => { success: boolean; message: string };
+  approveAgentPayout: (payoutId: string, txHash: string) => void;
+  rejectAgentPayout: (payoutId: string, reason: string) => void;
   payoutAgentCommission: (agentId: string, amount: number, paymentMethod: string, referenceNumber: string, notes?: string) => void;
   adjustAgentAccountBalance: (agentId: string, newBalance: number, reason: string) => void;
 
@@ -197,6 +210,16 @@ export interface AppStoreState {
   logoutWallet: () => void;
   transferBetweenWallets: (sourceWalletNumber: string, targetWalletNumber: string, amount: number) => { success: boolean; error?: string; message?: string; txId?: string };
 
+  // Disputes & Template State
+  walletTemplate: WalletTemplateConfig;
+  disputes: DisputeReport[];
+  selectedAgentDetailId: string | null;
+  updateWalletTemplate: (template: Partial<WalletTemplateConfig>) => void;
+  createDispute: (dispute: Omit<DisputeReport, 'id' | 'createdAt'>) => void;
+  updateDispute: (id: string, updates: Partial<DisputeReport>) => void;
+  resolveDispute: (id: string, resolutionNote: string, action: 'refund' | 'credit' | 'reject') => void;
+  setSelectedAgentDetailId: (id: string | null) => void;
+
   // Actions - Bot & Simulation Engine
   toggleBotEngine: () => void;
   updateBotConfig: (config: Partial<BotEngineConfig>) => void;
@@ -217,7 +240,7 @@ const mapWalletsWithAliases = (rawWallets: Wallet[]): Wallet[] => {
       phoneNumber: w.phoneNumber || w.walletNumber || w.accountNumber || '',
       accountNumber: w.accountNumber || w.walletNumber,
       accountHolder: w.accountHolder || (w.agentName ? `Agent: ${w.agentName}` : 'Central Wallet Pool'),
-      provider: w.provider || 'Vodafone Cash',
+      provider: w.provider || 'TRC20 Network',
       assignedAgentId: w.assignedAgentId !== undefined ? w.assignedAgentId : w.agentId,
       assignedAgentName: w.assignedAgentName || w.agentName,
       otpCode: activeOtp,
@@ -328,12 +351,34 @@ const persistStateToStorage = (state: AppStoreState) => {
     savePersistedData(STORAGE_KEYS.PERSISTED_WALLETS, state.wallets);
     savePersistedData(STORAGE_KEYS.PERSISTED_AGENT_DEPOSIT_REQUESTS, state.agentDepositRequests);
     savePersistedData(STORAGE_KEYS.PERSISTED_AGENT_PAYOUTS, state.agentPayouts);
+    savePersistedData(STORAGE_KEYS.PERSISTED_WALLET_TEMPLATE, state.walletTemplate);
+    savePersistedData(STORAGE_KEYS.PERSISTED_DISPUTES, state.disputes);
     savePersistedData(STORAGE_KEYS.PERSISTED_IS_PRODUCTION_MODE, state.isProductionMode);
     savePersistedData(STORAGE_KEYS.PERSISTED_COMMISSION_RATES, state.commissionRates);
     savePersistedData(STORAGE_KEYS.PERSISTED_DOMAIN_SETTINGS, state.domainSettings);
   } catch (err) {
     console.warn('[Persistence Middleware] Failed to persist state changes:', err);
   }
+};
+
+const DEFAULT_WALLET_TEMPLATE: WalletTemplateConfig = {
+  appName: 'UZX WALLET',
+  brandTagline: 'Official TRC20 Fast Electronic Wallet Gateway',
+  primaryColor: '#8B1E2D',
+  accentColor: '#10B981',
+  depositTitle: 'Fast USDT Deposit',
+  withdrawTitle: 'Instant USDT Payout',
+  depositAddress: 'TQjX9P2v7h78QvYvLpA69jTzM5wX84L3dK',
+  depositNetwork: 'TRC20 Network',
+  minDeposit: 10,
+  maxDeposit: 10000,
+  quickAmounts: [50, 100, 250, 500, 1000, 3000],
+  supportUrl: 'https://t.me/UZX_Wallet_Support',
+  announcementText: 'Official Mirror App — Fast TRC20 settlements active 24/7',
+  showTransactionHistory: true,
+  showQrCode: true,
+  logoText: 'UZX',
+  lastUpdated: new Date().toISOString()
 };
 
 /**
@@ -387,6 +432,10 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         pendingWithdrawals: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'withdrawal' && (t.status === 'Pending' || t.status === 'Processing')) : state.pendingWithdrawals,
         depositHistory: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'deposit' && (t.status === 'Approved' || t.status === 'Rejected')) : state.depositHistory,
         withdrawalHistory: data.transactions ? data.transactions.filter((t: Transaction) => t.type === 'withdrawal' && (t.status === 'Approved' || t.status === 'Rejected')) : state.withdrawalHistory,
+        agentDepositRequests: data.agentDepositRequests ? data.agentDepositRequests : state.agentDepositRequests,
+        agentPayouts: data.agentPayouts ? data.agentPayouts : state.agentPayouts,
+        disputes: data.disputes ? data.disputes : state.disputes,
+        walletTemplate: data.walletTemplate ? data.walletTemplate : state.walletTemplate,
         notifications: data.notifications ? data.notifications : state.notifications,
       }));
     } catch (err) {
@@ -479,7 +528,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
   inspectingTransaction: null,
   isProductionMode: false,
 
-  activeWalletNumber: '01031860138',
+  activeWalletNumber: 'TSa9281hG82ks901847192',
   walletOtpPendingNumber: null,
   isWalletLoggedIn: true,
 
@@ -487,8 +536,8 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     depositCommissionPercent: 1.5,
     withdrawalCommissionPercent: 1.0,
   },
-  supportedCurrencies: ['EGP', 'USD', 'USDT', 'SAR', 'AED'],
-  paymentMethods: ['Vodafone Cash', 'InstaPay', 'Orange Cash', 'Etisalat Cash', 'WE Pay', 'Bank Transfer'],
+  supportedCurrencies: ['USDT'],
+  paymentMethods: ['TRC20 Network', 'TRON Direct', 'USDT Hot Wallet'],
 
   banks: loadPersistedData(STORAGE_KEYS.PERSISTED_BANKS, initialBanks),
   pendingDeposits: loadPersistedData(STORAGE_KEYS.PERSISTED_PENDING_DEPOSITS, initialPendingDeposits),
@@ -510,6 +559,15 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     sslEnabled: true,
   },
   agentPayouts: loadPersistedData(STORAGE_KEYS.PERSISTED_AGENT_PAYOUTS, []),
+  walletTemplate: (() => {
+    const loaded = loadPersistedData<WalletTemplateConfig>(STORAGE_KEYS.PERSISTED_WALLET_TEMPLATE, DEFAULT_WALLET_TEMPLATE);
+    if (loaded && (loaded.appName === 'Management OS' || loaded.logoText === 'OS')) {
+      return DEFAULT_WALLET_TEMPLATE;
+    }
+    return loaded || DEFAULT_WALLET_TEMPLATE;
+  })(),
+  disputes: loadPersistedData(STORAGE_KEYS.PERSISTED_DISPUTES, []),
+  selectedAgentDetailId: null,
   totalSimulatedWalletsCount: 6000,
   lastPulseTime: Date.now(),
   notifications: [],
@@ -532,8 +590,8 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     autoCancelHours: 4,
     autoPauseInactiveHours: 2,
     totalWalletPoolTarget: 6000,
-    selectedProviders: ['Vodafone Cash', 'InstaPay', 'Orange Cash', 'Etisalat Cash'],
-    selectedBanks: ['Vodafone 9253', 'Vodafone 7655', 'Vodafone 2055', 'InstaPay 9021']
+    selectedProviders: ['TRC20 Network', 'TRON Direct', 'USDT Hot Wallet', 'Central Liquidity Node'],
+    selectedBanks: ['TRC20 Pool A', 'TRC20 Pool B', 'TRC20 Pool C', 'TRC20 Pool D']
   },
   globalTrafficActive: false,
   soundEnabled: true,
@@ -871,6 +929,29 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       }
     }
 
+    // Strict Balance & Security Deposit Check
+    if (targetAgentId || processedByRole === 'agent') {
+      const matchedAgent = agents.find((a) =>
+        (targetAgentId && (a.id === targetAgentId || a.name === targetAgentId || a.username === targetAgentId)) ||
+        (processedByRole === 'agent' && (a.name === processedBy || a.username === processedBy || a.id === processedBy))
+      );
+      if (matchedAgent) {
+        const securityFloor = matchedAgent.insuranceDeposit || matchedAgent.securityDeposit || 0;
+        const availableHeadroom = Math.max(0, (matchedAgent.currentBalance || 0) - securityFloor);
+        if (tx.amount > availableHeadroom) {
+          addNotification({
+            title: 'حظر تأكيد السحب: تجاوز حد التأمين',
+            message: `لا يمكن تأكيد سحب ${tx.amount} USDT. الرصيد القابل للصرف فوق حد التأمين (${securityFloor} USDT) هو ${availableHeadroom} USDT فقط.`,
+            type: 'danger',
+            targetAgentId: matchedAgent.id,
+            agentId: matchedAgent.id,
+            orderId: tx.id,
+          });
+          return;
+        }
+      }
+    }
+
     if (targetAgentId || processedByRole === 'agent') {
       updatedAgents = agents.map((a) => {
         const matches =
@@ -881,13 +962,21 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           appliedRate = wdlPercent;
           const wdlProfit = Number(((tx.amount * wdlPercent) / 100).toFixed(2));
           earnedWithdrawalProfit = wdlProfit;
+          const newBal = Math.max(0, Number(((a.currentBalance || 0) - tx.amount).toFixed(2)));
+          const securityFloor = a.insuranceDeposit || a.securityDeposit || 0;
+          const isAtOrBelowInsurance = newBal <= securityFloor;
+
           return {
             ...a,
             todayProcessedCount: (a.todayProcessedCount || 0) + 1,
             processedOrdersCount: (a.processedOrdersCount || 0) + 1,
             todayAssignedVolumeUSDT: (a.todayAssignedVolumeUSDT || 0) + tx.amount,
             processedVolume: (a.processedVolume || 0) + tx.amount,
-            currentBalance: Math.max(0, Number(((a.currentBalance || 0) - tx.amount).toFixed(2))),
+            currentBalance: newBal,
+            trafficActive: isAtOrBelowInsurance ? false : a.trafficActive,
+            autoPauseReason: isAtOrBelowInsurance
+              ? `Security Deposit Limit Reached (${securityFloor} USDT). Traffic automatically paused until new collateral is deposited.`
+              : a.autoPauseReason,
             profitBalance: Number(((a.profitBalance || 0) + wdlProfit).toFixed(2)),
             totalEarnedCommission: Number(((a.totalEarnedCommission || 0) + wdlProfit).toFixed(2)),
             lastActiveAt: new Date().toISOString(),
@@ -1098,7 +1187,12 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     const newAgentId = `AGT-${String(nextNum).padStart(2, '0')}`;
     
     // Auto-generate starter wallet for the agent
-    const starterPhone = agentData.phone || `010${Math.floor(10000000 + Math.random() * 90000000)}`;
+    let autoWalletId = 'T';
+    const randChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let j = 0; j < 33; j++) {
+      autoWalletId += randChars.charAt(Math.floor(Math.random() * randChars.length));
+    }
+    const starterPhone = agentData.phone || autoWalletId;
     const starterWalletId = `WLT-${newAgentId}-01`;
     const initialDeposit = agentData.insuranceDeposit || 10000;
 
@@ -1107,14 +1201,14 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       walletNumber: starterPhone,
       phoneNumber: starterPhone,
       accountNumber: starterPhone,
-      provider: agentData.depositPaymentMethod || agentData.depositMethod || 'Vodafone Cash',
+      provider: agentData.depositPaymentMethod || agentData.depositMethod || 'TRC20 Network',
       agentId: newAgentId,
       agentName: agentData.name,
       assignedAgentId: newAgentId,
       assignedAgentName: agentData.name,
       accountHolder: `Primary Wallet (${agentData.name})`,
       balance: initialDeposit,
-      currency: agentData.currency || 'EGP',
+      currency: agentData.currency || 'USDT',
       status: 'active',
       isBotWallet: false,
       createdAt: formatCairoTime(new Date()),
@@ -1229,7 +1323,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
 
     get().addNotification({
       title: 'New Agent Collateral Request',
-      message: `${agent.name} submitted a top-up request for ${amount} EGP via ${method}. Ref: ${ref}`,
+      message: `${agent.name} submitted a top-up request for ${amount} USDT via ${method}. Ref: ${ref}`,
       type: 'info',
       targetSection: 'agent-management',
     });
@@ -1285,7 +1379,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       title: status === 'Approved' ? 'Agent Collateral Approved' : 'Agent Collateral Rejected',
       message:
         status === 'Approved'
-          ? `Credited ${finalAmount} EGP to ${req.agentName}. Insurance balance updated.`
+          ? `Credited ${finalAmount} USDT to ${req.agentName}. Insurance balance updated.`
           : `Rejected deposit request for ${req.agentName}.`,
       type: status === 'Approved' ? 'success' : 'danger',
       targetSection: 'agent-management',
@@ -1293,33 +1387,40 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
   },
 
   addWalletsToPool: (count) => {
-    const newWallets: Wallet[] = Array.from({ length: count }).map(() => ({
-      id: `WLT-${Math.floor(1000 + Math.random() * 9000)}`,
-      walletNumber: `010${Math.floor(10000000 + Math.random() * 90000000)}`,
-      agentId: null,
-      agentName: null,
-      assignedAgentId: null,
-      balance: 0,
-      currency: 'EGP',
-      status: 'unassigned' as const,
-      createdAt: formatCairoTime(new Date()),
-      currentOtp: generateOtpCode(),
-      otpCode: generateOtpCode(),
-      minSingleLimit: 10,
-      maxSingleLimit: 5000,
-      singleTransactionLimit: 5000,
-      dailySendLimit: 20000,
-      dailyReceiveLimit: 30000,
-      dailyLimit: 20000,
-      monthlyLimit: 100000,
-      todaySent: 0,
-      todayReceived: 0,
-      todayTransferred: 0,
-      monthTotal: 0,
-      provider: 'Vodafone Cash',
-      accountHolder: 'Central Wallet Pool',
-      accountNumber: '',
-    }));
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const newWallets: Wallet[] = Array.from({ length: count }).map(() => {
+      let randAddress = 'T';
+      for (let j = 0; j < 33; j++) {
+        randAddress += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return {
+        id: `WLT-${Math.floor(1000 + Math.random() * 9000)}`,
+        walletNumber: randAddress,
+        agentId: null,
+        agentName: null,
+        assignedAgentId: null,
+        balance: 0,
+        currency: 'USDT',
+        status: 'unassigned' as const,
+        createdAt: formatCairoTime(new Date()),
+        currentOtp: generateOtpCode(),
+        otpCode: generateOtpCode(),
+        minSingleLimit: 10,
+        maxSingleLimit: 5000,
+        singleTransactionLimit: 5000,
+        dailySendLimit: 20000,
+        dailyReceiveLimit: 30000,
+        dailyLimit: 20000,
+        monthlyLimit: 100000,
+        todaySent: 0,
+        todayReceived: 0,
+        todayTransferred: 0,
+        monthTotal: 0,
+        provider: 'TRC20 Network',
+        accountHolder: 'Central Wallet Pool',
+        accountNumber: '',
+      };
+    });
 
     set((state) => ({ wallets: mapWalletsWithAliases([...newWallets, ...state.wallets]) }));
   },
@@ -1327,9 +1428,12 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
   generateManualWallet: (data) => {
     const { wallets, agents, addNotification } = get();
 
-    const prefixList = ['010', '011', '012', '015'];
-    const prefix = prefixList[Math.floor(Math.random() * prefixList.length)];
-    const walletNum = data.phoneNumber?.trim() || `${prefix}${Math.floor(10000000 + Math.random() * 90000000)}`;
+    let autoAddress = 'T';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let j = 0; j < 33; j++) {
+      autoAddress += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const walletNum = data.phoneNumber?.trim() || autoAddress;
 
     const targetAgent = data.agentId ? agents.find((a) => a.id === data.agentId) : null;
 
@@ -1344,14 +1448,14 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       walletNumber: walletNum,
       phoneNumber: walletNum,
       accountNumber: walletNum,
-      provider: data.provider || 'Vodafone Cash',
+      provider: data.provider || 'TRC20 Network',
       agentId: targetAgent ? targetAgent.id : null,
       agentName: targetAgent ? targetAgent.name : null,
       assignedAgentId: targetAgent ? targetAgent.id : null,
       assignedAgentName: targetAgent ? targetAgent.name : null,
       accountHolder: targetAgent ? `Agent: ${targetAgent.name}` : 'Central Operations Pool',
       balance: data.initialBalance !== undefined ? data.initialBalance : 0,
-      currency: 'EGP',
+      currency: 'USDT',
       status: targetAgent ? 'active' : 'unassigned',
       isBotWallet: false,
       createdAt: formatCairoTime(new Date()),
@@ -1694,10 +1798,10 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       userId: `USR-${source.walletNumber.slice(-4)}`,
       userFullName: `Internal P2P Transfer (${source.walletNumber} -> ${target.walletNumber})`,
       amount,
-      currency: source.currency || 'EGP',
+      currency: source.currency || 'USDT',
       status: 'Approved',
       bankName: 'Internal P2P Network',
-      provider: source.provider || 'Vodafone Cash',
+      provider: source.provider || 'TRC20 Network',
       type: 'transfer',
       dateOfCreation: formatCairoTime(new Date()),
       timeOfProcessing: 'Instant',
@@ -1718,7 +1822,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
 
     addNotification({
       title: 'تم التحويل بنجاح',
-      message: `تم تحويل ${amount.toLocaleString()} ج.م من المحفظة [${source.walletNumber}] إلى [${target.walletNumber}]. رقم العملية: ${txId}`,
+      message: `تم تحويل ${amount.toLocaleString()} USDT من المحفظة [${source.walletNumber}] إلى [${target.walletNumber}]. رقم العملية: ${txId}`,
       type: 'success',
       targetSection: 'transactions',
     });
@@ -1759,7 +1863,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
 
     if (!eligibleAgents.length) return;
 
-    const providerList = botConfig.selectedProviders.length ? botConfig.selectedProviders : ['Vodafone Cash', 'InstaPay', 'Orange Cash', 'Etisalat Cash'];
+    const providerList = botConfig.selectedProviders.length ? botConfig.selectedProviders : ['TRC20 Network', 'TRON Direct', 'USDT Hot Wallet', 'Central Liquidity Node'];
     const provider = providerList[Math.floor(Math.random() * providerList.length)];
 
     // Target deposit calculation
@@ -1798,9 +1902,12 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       
       if (botWallets.length < 6000) {
         // Generate a dedicated bot wallet for this order until cap of 6,000
-        const prefixList = ['010', '011', '012', '015'];
-        const prefix = prefixList[Math.floor(Math.random() * prefixList.length)];
-        const botPhone = `${prefix}${Math.floor(10000000 + Math.random() * 90000000)}`;
+        let botWalletAddr = 'T';
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let j = 0; j < 33; j++) {
+          botWalletAddr += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const botPhone = botWalletAddr;
         const botWalletId = `WLT-BOT-${String(botWallets.length + 1).padStart(5, '0')}`;
 
         selectedBotWallet = {
@@ -1815,7 +1922,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
           assignedAgentName: agent.name,
           accountHolder: `Bot Wallet (${agent.name})`,
           balance: Math.floor(Math.random() * 8000) + 1000,
-          currency: agent.currency || 'EGP',
+          currency: agent.currency || 'USDT',
           status: 'active',
           isBotWallet: true,
           createdAt: formatCairoTime(new Date()),
@@ -1855,12 +1962,26 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     const expires = new Date(now.getTime() + botConfig.autoCancelHours * 3600000);
 
     if (isDeposit) {
+      const wrongWalletRate = botConfig.wrongWalletErrorRatePercent !== undefined ? botConfig.wrongWalletErrorRatePercent : 10;
+      const isWrongWalletMismatch = Math.random() * 100 < wrongWalletRate;
+      let actualSentWallet = selectedBotWallet.walletNumber;
+      let newDispute: DisputeReport | null = null;
+
+      if (isWrongWalletMismatch) {
+        let errAddr = 'TErr';
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let j = 0; j < 30; j++) {
+          errAddr += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        actualSentWallet = errAddr;
+      }
+
       const newDeposit: Transaction = {
         id: `TX-${generateRandomId('', 6)}`,
         userId: `USR-${clientPhone.slice(-4)}`,
         userFullName: `Client (${clientPhone.slice(-4)})`,
         amount,
-        currency: agent.currency || 'EGP',
+        currency: agent.currency || 'USDT',
         status: 'Pending',
         bankName: bank,
         provider,
@@ -1873,12 +1994,39 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         subagentId: agent.id,
         subagentName: agent.name,
         targetWalletId: selectedBotWallet.walletNumber,
-        userInfo: `Bot Wallet: ${selectedBotWallet.walletNumber}\nProvider: ${provider}\nRef: ${hash}`,
+        userInfo: isWrongWalletMismatch
+          ? `⚠️ [WRONG WALLET DETECTED] Customer transferred ${amount} USDT to unassigned wallet: ${actualSentWallet} instead of invoice wallet: ${selectedBotWallet.walletNumber}`
+          : `Bot Wallet: ${selectedBotWallet.walletNumber}\nProvider: ${provider}\nRef: ${hash}`,
         phone: clientPhone,
         referenceHash: hash,
         createdAt: now.toISOString(),
         expiresAt: expires.toISOString(),
       };
+
+      if (isWrongWalletMismatch) {
+        newDispute = {
+          id: `DISP-${Date.now().toString().slice(-6)}`,
+          orderId: newDeposit.id,
+          agentId: agent.id,
+          agentName: agent.name,
+          disputeType: 'wrong_wallet',
+          reason: 'تحويل خاطئ - العميل أرسل إلى عنوان محفظة مغاير للعنوان المحدد في الفاتورة',
+          userFullName: newDeposit.userFullName,
+          userPhone: clientPhone,
+          expectedAmount: amount,
+          receivedAmount: amount,
+          requestedWallet: selectedBotWallet.walletNumber,
+          expectedWallet: selectedBotWallet.walletNumber,
+          actualSenderWallet: actualSentWallet,
+          actualSentWallet: actualSentWallet,
+          currency: agent.currency || 'USDT',
+          status: 'Open',
+          agentComment: '',
+          notes: `تم رصد تحويل بقيمة ${amount} USDT على محفظة مغايرة (${actualSentWallet}) عن محفظة الطلب (${selectedBotWallet.walletNumber}). مهلة الحل: ساعتان.`,
+          createdAt: now.toISOString(),
+          dueAt: new Date(now.getTime() + 2 * 3600000).toISOString(),
+        };
+      }
 
       const updatedAgents = agents.map((a) =>
         a.id === agent.id
@@ -1897,6 +2045,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       set((state) => ({
         wallets: mapWalletsWithAliases(updatedWalletsList),
         pendingDeposits: [newDeposit, ...state.pendingDeposits],
+        disputes: newDispute ? [newDispute, ...state.disputes] : state.disputes,
         agents: updatedAgents,
         botConfig: {
           ...state.botConfig,
@@ -1908,22 +2057,34 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       apiService.createTransaction(newDeposit).catch(() => {});
       soundManager.playTransactionChime();
 
-      addNotification({
-        title: `New Deposit Order: ${amount} ${agent.currency || 'EGP'}`,
-        message: `Inbound ${provider} deposit assigned to [${agent.name}]. Wallet: ${selectedBotWallet.walletNumber}`,
-        type: 'info',
-        targetSection: 'pending-deposits',
-        targetAgentId: agent.id,
-        agentId: agent.id,
-        orderId: newDeposit.id,
-      });
+      if (isWrongWalletMismatch) {
+        addNotification({
+          title: `⚠️ تنبيه تحويل خاطئ (Wrong Wallet): ${amount} USDT`,
+          message: `طلب #${newDeposit.id} تم التحويل فيه على محفظة غير مطابقة. تم فتح شكوى بنظام النزاعات مهلة ساعتين لحلها من قبل الوكيل [${agent.name}].`,
+          type: 'danger',
+          targetSection: 'disputes',
+          targetAgentId: agent.id,
+          agentId: agent.id,
+          orderId: newDeposit.id,
+        });
+      } else {
+        addNotification({
+          title: `New Deposit Order: ${amount} ${agent.currency || 'USDT'}`,
+          message: `Inbound ${provider} deposit assigned to [${agent.name}]. Wallet: ${selectedBotWallet.walletNumber}`,
+          type: 'info',
+          targetSection: 'pending-deposits',
+          targetAgentId: agent.id,
+          agentId: agent.id,
+          orderId: newDeposit.id,
+        });
+      }
     } else {
       const newWithdrawal: Transaction = {
         id: `TX-WD-${generateRandomId('', 4)}`,
         userId: `USR-${clientPhone.slice(-4)}`,
         userFullName: `Client Withdrawal (${clientPhone.slice(-4)})`,
         amount,
-        currency: agent.currency || 'EGP',
+        currency: agent.currency || 'USDT',
         status: 'Pending',
         bankName: bank,
         provider,
@@ -1971,7 +2132,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       soundManager.playTransactionChime();
 
       addNotification({
-        title: `Pending Withdrawal Order: ${amount} ${agent.currency || 'EGP'}`,
+        title: `Pending Withdrawal Order: ${amount} ${agent.currency || 'USDT'}`,
         message: `Pending withdrawal dispatched to [${agent.name}]. Wallet: ${selectedBotWallet.walletNumber}`,
         type: 'warning',
         targetSection: 'pending-withdrawals',
@@ -1979,6 +2140,186 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         agentId: agent.id,
         orderId: newWithdrawal.id,
       });
+    }
+  },
+
+  requestAgentCommissionPayout: (agentId, amount, payoutAddress, notes) => {
+    const { agents, agentPayouts, addNotification } = get();
+    const agent = agents.find((a) => a.id === agentId);
+    if (!agent) {
+      return { success: false, message: 'الوكيل غير موجود في النظام' };
+    }
+    const currentProfit = agent.profitBalance || 0;
+    if (amount <= 0 || amount > currentProfit) {
+      return {
+        success: false,
+        message: `رصيد الأرباح المتاح (${currentProfit} USDT) غير كافٍ لسحب ${amount} USDT`,
+      };
+    }
+
+    const newPayout: AgentPayout = {
+      id: `PAY-${Date.now().toString().slice(-6)}`,
+      agentId,
+      agentName: agent.name,
+      amount,
+      currency: agent.currency || 'USDT',
+      payoutType: 'commission',
+      paymentMethod: 'USDT TRC20',
+      payoutAddress,
+      status: 'Pending',
+      referenceNumber: `REQ-${Date.now().toString().slice(-4)}`,
+      notes: notes || 'طلب سحب أرباح الوكيل',
+      createdAt: formatCairoTime(new Date()),
+    };
+
+    set({
+      agentPayouts: [newPayout, ...agentPayouts],
+    });
+
+    addNotification({
+      title: `🔔 طلب سحب أرباح جديد: ${agent.name}`,
+      message: `طلب الوكيل سحب عمولات بقيمة ${amount.toLocaleString()} USDT على عنوان ${payoutAddress}. بانتظار تأكيد التحويل.`,
+      type: 'warning',
+      targetSection: 'agent-payouts',
+      targetAgentId: agent.id,
+      agentId: agent.id,
+    });
+
+    return { success: true, message: 'تم تقديم طلب سحب الأرباح بنجاح وبانتظار موافقة الأدمن' };
+  },
+
+  requestAgentPayout: (agentId, amount, payoutAddress, notes) => {
+    return get().requestAgentCommissionPayout(agentId, amount, payoutAddress, notes);
+  },
+
+  approveAgentPayout: (payoutId, txHash) => {
+    const { agents, agentPayouts, addNotification } = get();
+    const payout = agentPayouts.find((p) => p.id === payoutId);
+    if (!payout) return;
+
+    const agent = agents.find((a) => a.id === payout.agentId);
+    if (!agent) return;
+
+    const updatedPayouts = agentPayouts.map((p) =>
+      p.id === payoutId
+        ? {
+            ...p,
+            status: 'Approved' as const,
+            txHash: txHash || `TX-${Date.now().toString().slice(-8)}`,
+            processedBy: 'Master Administrator',
+            processedAt: formatCairoTime(new Date()),
+          }
+        : p
+    );
+
+    const updatedAgents = agents.map((a) => {
+      if (a.id === payout.agentId) {
+        return {
+          ...a,
+          profitBalance: Math.max(0, (a.profitBalance || 0) - payout.amount),
+          totalPaidCommission: (a.totalPaidCommission || 0) + payout.amount,
+        };
+      }
+      return a;
+    });
+
+    set({
+      agentPayouts: updatedPayouts,
+      agents: updatedAgents,
+    });
+
+    addNotification({
+      title: `✅ تم تحويل وصرف الأرباح: ${agent.name}`,
+      message: `تم تأكيد إرسال ${payout.amount} USDT إلى عنوان ${payout.payoutAddress || 'TRC20 Wallet'}. رقم الحوالة: ${txHash}`,
+      type: 'success',
+      targetSection: 'agent-payouts',
+      targetAgentId: agent.id,
+      agentId: agent.id,
+    });
+
+    // Trigger Realtime Socket Event & Scoped Agent Notification
+    try {
+      socketService.triggerLocalScopedNotification(agent.id, {
+        id: `notif_payout_${Date.now()}`,
+        title: '✅ Payout Approved & Sent',
+        message: `Your payout request for ${payout.amount} USDT has been confirmed by Master Admin. TxHash: ${txHash}`,
+        type: 'success',
+        agentId: agent.id,
+        targetAgentId: agent.id,
+        targetSection: 'agent-payouts',
+        timestamp: formatCairoTime(new Date()),
+        data: {
+          payoutId: payout.id,
+          amount: payout.amount,
+          txHash,
+          status: 'Approved',
+        },
+      });
+
+      socketService.emit('payout:status:updated', {
+        payoutId: payout.id,
+        agentId: agent.id,
+        status: 'Approved',
+        amount: payout.amount,
+        txHash,
+        payoutAddress: payout.payoutAddress,
+        timestamp: formatCairoTime(new Date()),
+      });
+    } catch (err) {
+      console.warn('[Socket Notification] Could not emit payout approval:', err);
+    }
+  },
+
+  rejectAgentPayout: (payoutId, reason) => {
+    const { agentPayouts, addNotification } = get();
+    const payout = agentPayouts.find((p) => p.id === payoutId);
+    if (!payout) return;
+
+    const updatedPayouts = agentPayouts.map((p) =>
+      p.id === payoutId
+        ? {
+            ...p,
+            status: 'Rejected' as const,
+            notes: reason || 'تم رفض طلب السحب من قبل الإدارة',
+            processedBy: 'Master Administrator',
+            processedAt: formatCairoTime(new Date()),
+          }
+        : p
+    );
+
+    set({ agentPayouts: updatedPayouts });
+
+    addNotification({
+      title: `❌ تم رفض طلب سحب الأرباح: ${payout.agentName}`,
+      message: `تم رفض طلب سحب ${payout.amount} USDT. السبب: ${reason || 'بيانات غير مطابقة'}`,
+      type: 'danger',
+      targetSection: 'agent-payouts',
+      targetAgentId: payout.agentId,
+      agentId: payout.agentId,
+    });
+
+    try {
+      socketService.triggerLocalScopedNotification(payout.agentId, {
+        id: `notif_payout_rej_${Date.now()}`,
+        title: '❌ Payout Request Rejected',
+        message: `Your payout request for ${payout.amount} USDT was rejected. Reason: ${reason || 'Invalid data'}`,
+        type: 'danger',
+        agentId: payout.agentId,
+        targetAgentId: payout.agentId,
+        targetSection: 'agent-payouts',
+        timestamp: formatCairoTime(new Date()),
+      });
+
+      socketService.emit('payout:status:updated', {
+        payoutId: payout.id,
+        agentId: payout.agentId,
+        status: 'Rejected',
+        amount: payout.amount,
+        reason,
+        timestamp: formatCairoTime(new Date()),
+      });
+    } catch (err) {
+      console.warn('[Socket Notification] Could not emit payout rejection:', err);
     }
   },
 
@@ -1992,7 +2333,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
       agentId,
       agentName: agent.name,
       amount,
-      currency: agent.currency || 'EGP',
+      currency: agent.currency || 'USDT',
       payoutType: 'commission',
       paymentMethod,
       referenceNumber,
@@ -2020,7 +2361,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
 
     addNotification({
       title: `Commission Disbursed: ${agent.name}`,
-      message: `Commission payout of ${amount.toLocaleString()} ${agent.currency || 'EGP'} transferred to agent account (${agent.name}). Ref: ${referenceNumber}`,
+      message: `Commission payout of ${amount.toLocaleString()} ${agent.currency || 'USDT'} transferred to agent account (${agent.name}). Ref: ${referenceNumber}`,
       type: 'success',
       targetSection: 'financial-reports',
       targetAgentId: agent.id,
@@ -2042,7 +2383,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
 
     addNotification({
       title: `Agent Balance Adjusted: ${agent.name}`,
-      message: `Central account balance for agent updated from ${prevBal.toLocaleString()} to ${newBalance.toLocaleString()} ${agent.currency || 'EGP'}. Reason: ${reason}`,
+      message: `Central account balance for agent updated from ${prevBal.toLocaleString()} to ${newBalance.toLocaleString()} ${agent.currency || 'USDT'}. Reason: ${reason}`,
       type: 'info',
       targetSection: 'agent-management',
     });
@@ -2097,7 +2438,7 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
         return {
           ...agent,
           trafficActive: false,
-          autoPauseReason: `Auto-paused: Collateral (${agent.currentBalance} EGP) is below threshold (${agent.trafficThreshold} EGP).`,
+          autoPauseReason: `Auto-paused: Collateral (${agent.currentBalance} USDT) is below threshold (${agent.trafficThreshold} USDT).`,
         };
       }
 
@@ -2105,6 +2446,112 @@ export const useAppStore = create<AppStoreState>()(persistMiddleware((set, get) 
     });
 
     set({ agents: updatedAgents });
+  },
+
+  updateWalletTemplate: (templateUpdates) => {
+    set((state) => {
+      const nextTemplate = {
+        ...state.walletTemplate,
+        ...templateUpdates,
+        lastUpdated: new Date().toISOString(),
+      };
+      apiService.updateWalletTemplate(nextTemplate).catch(() => {});
+      return { walletTemplate: nextTemplate };
+    });
+    get().addNotification({
+      title: 'Wallet Template Updated Live',
+      message: 'Mobile app design and configuration changes are now live across all mirror instances.',
+      type: 'success',
+      targetSection: 'wallet-template',
+    });
+  },
+
+  createDispute: (disputeData) => {
+    const newDispute: DisputeReport = {
+      ...disputeData,
+      id: `DSP-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      dueAt: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+      status: disputeData.status || 'Open',
+    };
+
+    set((state) => ({
+      disputes: [newDispute, ...state.disputes],
+    }));
+
+    apiService.createDispute(newDispute).catch(() => {});
+
+    get().addNotification({
+      title: `Complaint/Dispute Logged: #${newDispute.id}`,
+      message: `Deposit claim regarding order ${newDispute.orderId || 'Direct'} (${newDispute.receivedAmount} USDT) submitted for review.`,
+      type: 'warning',
+      targetSection: 'disputes',
+      targetAgentId: newDispute.agentId,
+      agentId: newDispute.agentId,
+    });
+  },
+
+  updateDispute: (id, updates) => {
+    set((state) => ({
+      disputes: state.disputes.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+    }));
+    apiService.updateDispute(id, updates).catch(() => {});
+  },
+
+  resolveDispute: (id, resolutionNote, action) => {
+    const { disputes, agents, wallets, addNotification } = get();
+    const dispute = disputes.find((d) => d.id === id);
+    if (!dispute) return;
+
+    const resolvedStatus = action === 'reject' ? 'Rejected' : 'Resolved';
+
+    // If resolution credits agent or updates balance
+    if (action === 'credit' && dispute.agentId) {
+      const agent = agents.find((a) => a.id === dispute.agentId);
+      if (agent) {
+        const creditedAmount = Number(dispute.receivedAmount || dispute.expectedAmount || 0);
+        const newBal = (agent.currentBalance || 0) + creditedAmount;
+        set((state) => ({
+          agents: state.agents.map((a) => (a.id === agent.id ? { ...a, currentBalance: newBal } : a)),
+        }));
+        apiService.updateAgent(agent.id, { currentBalance: newBal }).catch(() => {});
+      }
+    }
+
+    set((state) => ({
+      disputes: state.disputes.map((d) =>
+        d.id === id
+          ? {
+              ...d,
+              status: resolvedStatus,
+              adminResolutionNote: resolutionNote,
+              resolvedAt: new Date().toISOString(),
+            }
+          : d
+      ),
+    }));
+
+    apiService.updateDispute(id, {
+      status: resolvedStatus,
+      adminResolutionNote: resolutionNote,
+      resolvedAt: new Date().toISOString(),
+    }).catch(() => {});
+
+    addNotification({
+      title: `Dispute ${id} ${resolvedStatus}`,
+      message: `Dispute for order ${dispute.orderId} resolved with action: ${action}. Note: ${resolutionNote}`,
+      type: resolvedStatus === 'Resolved' ? 'success' : 'danger',
+      targetSection: 'disputes',
+      targetAgentId: dispute.agentId,
+      agentId: dispute.agentId,
+    });
+  },
+
+  setSelectedAgentDetailId: (id) => {
+    set({
+      selectedAgentDetailId: id,
+      activeSection: id ? 'agent-detail' : 'agent-management',
+    });
   },
 
   addNotification: (notifData) => {
